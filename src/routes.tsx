@@ -9,6 +9,7 @@ import { ProjectsScreen } from "./screens/projects-screen";
 import { SettingsScreen } from "./screens/settings-screen";
 import { VaultScreen } from "./screens/vault-screen";
 import { WorkspacesScreen } from "./screens/workspaces-screen";
+import { WorkspaceDetailScreen } from "./screens/workspace-detail-screen";
 
 export const routes: RouteObject[] = [
   {
@@ -21,6 +22,7 @@ export const routes: RouteObject[] = [
       { id: "projects", path: "projects", element: <ProjectsScreen /> },
       { id: "project-detail", path: "projects/:id", element: <ProjectDetailScreen /> },
       { id: "workspaces", path: "workspaces", element: <WorkspacesScreen /> },
+      { id: "workspace-detail", path: "workspaces/:id", element: <WorkspaceDetailScreen /> },
       { id: "config", path: "config", element: <ConfigScreen /> },
       { id: "vault", path: "vault", element: <VaultScreen /> },
       { id: "notes", path: "notes", element: <NotesScreen /> },

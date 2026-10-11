@@ -1,6 +1,6 @@
 use rusqlite_migration::{Migrations, M};
 
-pub const MIGRATIONS_COUNT: usize = 3;
+pub const MIGRATIONS_COUNT: usize = 4;
 
 pub fn migrations() -> Migrations<'static> {
     Migrations::new(vec![
@@ -35,6 +35,27 @@ INSERT INTO editor_profiles (kind, name, exe_path, is_default) VALUES
   ('vs_code', 'VS Code', '', 0),
   ('custom', 'Custom', '', 0);
 CREATE UNIQUE INDEX editor_one_default ON editor_profiles(is_default) WHERE is_default = 1;",
+        ),
+        M::up(
+            "CREATE TABLE workspaces (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  name_key TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+-- foreign_keys is off, so ON DELETE CASCADE is not relied on; the domain deletes items explicitly.
+CREATE TABLE workspace_items (
+  id INTEGER PRIMARY KEY,
+  workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('file','folder')),
+  path TEXT NOT NULL,
+  path_key TEXT NOT NULL,
+  project_id INTEGER,
+  editor_kind TEXT NOT NULL,
+  UNIQUE (workspace_id, position),
+  UNIQUE (workspace_id, path_key)
+);",
         ),
     ])
 }

@@ -84,3 +84,22 @@ Open gaps for the Step 6 reviewer:
 - Step 6 approved ("Approve for Ship"). Step 7: local commit `bdbb3c5` on `feature/editor-profiles`; roadmap F03 = shipped. No remote, so no push or PR.
 - Built-app smoke still outstanding for F01–F03 (dev-mode runs only).
 - Next pending in build order: F04 Workspace builder (depends on F02, F03). Restarts at Step 1 when the user says go.
+
+## workspace-builder
+
+| Step | Name | Agent | Status | Output |
+|---|---|---|---|---|
+| 1 | Spec | brainstorming | complete | docs/specs/workspace-builder/spec.md (approved; D1 reject duplicate paths; D2 default profile stored on the item at add time; D3 move up/down buttons) |
+| 2 | Plan | writing-plans | complete | docs/specs/workspace-builder/plan.md |
+| 3 | Implement | task (Rust), frontend-developer (UI) | complete | branch `feature/workspace-builder` (cut from ad0bd40); not committed |
+| 4 | Review | code-reviewer | complete | 2 major (0-based numbering shown; command mapping untested), 6 minor, 4 nit; majors and minors fixed (unique-violation code, reject `?`/`.` UNC server, focus and Escape on confirmations, delete navigation order, error routing to selects, spec wording); nit N4 (N+1 query) accepted |
+| 5 | E2E | task (dev-mode run) | complete | docs/E2E-TESTS-F04.md: 30 PASS, 0 FAIL, 0 BLOCKED |
+| 6 | Manual Check | Human | pending (hard gate) | — |
+| 7 | Ship | finishing-a-development-branch | pending | — |
+
+Verification at fix close: `npm run build` ok; `npm run lint` ok; `npx vitest run` 72 pass; `cargo test --lib` 91 pass; `cargo build` 0 warnings.
+
+Open gaps for the Step 6 reviewer:
+- Persistence check used a webview reload, not a full app restart (AC-20). Reopen behaviour is covered by the Rust persistence test.
+- E2E ran against `tauri dev`, not the built app (constitution P4). Still outstanding for F01–F04.
+- Test data from earlier E2E runs remains in the real database (projects App A, App A Sub, app b, App C) — intentionally kept; workspaces were all deleted.

@@ -1,6 +1,7 @@
 pub mod editors;
 pub mod projects;
 pub mod storage;
+pub mod workspaces;
 
 use serde::{Deserialize, Serialize};
 

@@ -39,7 +39,17 @@ pub fn run() {
             commands::editors::editor_profiles_set_default,
             commands::editors::editor_open,
             commands::editors::editor_pick_executable,
-            commands::editors::editor_pick_item
+            commands::editors::editor_pick_item,
+            commands::workspaces::workspaces_list,
+            commands::workspaces::workspaces_get,
+            commands::workspaces::workspaces_create,
+            commands::workspaces::workspaces_rename,
+            commands::workspaces::workspaces_delete,
+            commands::workspaces::workspace_items_add,
+            commands::workspaces::workspace_items_update,
+            commands::workspaces::workspace_items_remove,
+            commands::workspaces::workspace_items_move,
+            commands::workspaces::workspaces_pick_item
         ])
         .run(tauri::generate_context!())
         .expect("error while running DevShelf");

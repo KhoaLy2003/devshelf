@@ -178,3 +178,112 @@ export interface EditorPickItemArgs {
 export interface EditorPickItemResult {
   path: string | null;
 }
+
+export type WorkspaceCode =
+  | "name_empty"
+  | "name_too_long"
+  | "name_taken"
+  | "workspace_not_found"
+  | "item_path_empty"
+  | "item_path_too_long"
+  | "item_relative_path"
+  | "item_path_not_found"
+  | "item_duplicate"
+  | "item_not_found"
+  | "project_not_found"
+  | "profile_not_found"
+  | "move_blocked"
+  | "storage_unavailable";
+
+// Rust (workspaces::Item.kind) is authoritative; keep this list in sync.
+export const WORKSPACE_ITEM_KINDS = ["file", "folder"] as const;
+
+export type WorkspaceItemKind = (typeof WORKSPACE_ITEM_KINDS)[number];
+
+export interface WorkspaceItemView {
+  id: number;
+  position: number;
+  kind: WorkspaceItemKind;
+  path: string;
+  project_id: number | null;
+  editor_kind: string;
+}
+
+export interface WorkspaceView {
+  id: number;
+  name: string;
+  items: WorkspaceItemView[];
+}
+
+export interface WorkspaceSummaryView {
+  id: number;
+  name: string;
+  item_count: number;
+  project_names: string[];
+}
+
+export type WorkspacesListArgs = Record<string, never>;
+
+export interface WorkspacesListResult {
+  workspaces: WorkspaceSummaryView[];
+  error: WorkspaceCode | null;
+  detail: string | null;
+}
+
+export interface WorkspaceGetArgs {
+  id: number;
+}
+
+export interface WorkspaceResult {
+  workspace: WorkspaceView | null;
+  error: WorkspaceCode | null;
+  detail: string | null;
+}
+
+export interface WorkspaceCreateArgs {
+  name: string;
+}
+
+export interface WorkspaceRenameArgs {
+  id: number;
+  name: string;
+}
+
+export interface WorkspaceDeleteArgs {
+  id: number;
+}
+
+export interface WorkspaceDeleteResult {
+  error: WorkspaceCode | null;
+  detail: string | null;
+}
+
+export interface ItemAddArgs {
+  workspace_id: number;
+  path: string;
+  project_id: number | null;
+  editor_kind: string | null;
+}
+
+export interface ItemUpdateArgs {
+  item_id: number;
+  project_id: number | null;
+  editor_kind: string;
+}
+
+export interface ItemRemoveArgs {
+  item_id: number;
+}
+
+export interface ItemMoveArgs {
+  item_id: number;
+  up: boolean;
+}
+
+export interface WorkspacePickItemArgs {
+  folder: boolean;
+}
+
+export interface WorkspacePickResult {
+  path: string | null;
+}
