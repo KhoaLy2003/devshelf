@@ -78,3 +78,9 @@ Open gaps for the Step 6 reviewer:
 - C17 (stale error after save) is fixed but the re-check was not re-run in E2E; only the build was verified after the fix.
 - C08b: the Notepad++ profile launch could not be observed. A copy of System32 notepad.exe exits with code 0 and shows no window. The spawn path is covered only by the Rust tests (argument vector, spaced path, spawned copy exits cleanly).
 - Set-default with an empty path is refused with AC-20 copy. Spec AC-05 reads as if this should succeed; this is a spec clarification to confirm.
+
+### editor-profiles: Step 6 and Step 7
+
+- Step 6 approved ("Approve for Ship"). Step 7: local commit `bdbb3c5` on `feature/editor-profiles`; roadmap F03 = shipped. No remote, so no push or PR.
+- Built-app smoke still outstanding for F01–F03 (dev-mode runs only).
+- Next pending in build order: F04 Workspace builder (depends on F02, F03). Restarts at Step 1 when the user says go.
