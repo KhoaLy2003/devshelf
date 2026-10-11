@@ -1,3 +1,4 @@
+pub mod projects;
 pub mod storage;
 
 use serde::{Deserialize, Serialize};

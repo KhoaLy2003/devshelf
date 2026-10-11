@@ -11,7 +11,7 @@ Tauri 2 (WebView2) shell; React + TypeScript + Vite UI; Rust core; SQLite via `r
 ## Layout
 
 - `src/` - React UI (`app.tsx`, `lib/commands.ts` invoke wrappers, `types/commands.ts` shared command types).
-- `src-tauri/src/` - Rust core: `commands/` (Tauri commands), domain modules `projects`, `editors`, `workspaces`, `config`, `notes`, `vault`, and persistence `db`. Domain modules are empty placeholders.
+- `src-tauri/src/` - Rust core: `commands/` (Tauri commands), domain modules `projects`, `editors`, `workspaces`, `config`, `notes`, `vault`, and persistence `db`. The `projects` domain module is implemented; the others remain empty placeholders.
 - `tests/` - Vitest tests. Rust tests are `#[cfg(test)]` modules.
 - `docs/` - approved docs: architecture, constitution, DESIGN (dark theme only), roadmap, models. `kit/` is gitignored tooling.
 

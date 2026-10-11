@@ -8,19 +8,35 @@ Phase 2 Scope: `feature` (experimental). Build order: F01 → F02 → F03 → F0
 
 | Step | Name | Agent | Status | Output |
 |---|---|---|---|---|
-| 1 | Spec | brainstorming | complete | docs/specs/foundation-and-navigation/spec.md (approved at hard gate; D1–D4 at recommended defaults) |
-| 2 | Plan | writing-plans | complete | docs/specs/foundation-and-navigation/plan.md (soft gate passed; 7 tasks, 4 parallel groups) |
-| 3 | Implement | task, frontend-developer (no backend-developer agent is configured; Rust tasks ran on `task`) | complete | src-tauri/src/db/*, src-tauri/src/commands/*, src-tauri/src/lib.rs, src/*, tests/nav.test.ts, tests/storage-messages.test.ts, tests/gate.test.ts, tests/router.test.ts |
-| 4 | Review | code-reviewer | complete | 1 major, 7 minor, 3 nit findings; major and minor fixed. Nit 10 (unused `appInfo` wrapper) and nit 12 (identifier) left as-is, see notes |
-| 5 | E2E | task (desktop run) | complete | docs/E2E-TESTS.md: 18 PASS, 0 FAIL, 2 BLOCKED (AC-30 window focus; trailing-slash route covered by tests/router.test.ts) |
+| 1 | Spec | brainstorming | complete | docs/specs/foundation-and-navigation/spec.md (approved; D1–D4 recommended) |
+| 2 | Plan | writing-plans | complete | docs/specs/foundation-and-navigation/plan.md |
+| 3 | Implement | task, frontend-developer (no backend-developer agent configured) | complete | branch `feature/foundation-and-navigation` |
+| 4 | Review | code-reviewer | complete | 1 major, 7 minor, 3 nit; major and minor fixed; nits 10 and 12 kept |
+| 5 | E2E | task (desktop run) | complete | docs/E2E-TESTS.md: 18 PASS, 0 FAIL, 2 BLOCKED |
+| 6 | Manual Check | Human | complete (approved "Approve for Ship") | — |
+| 7 | Ship | finishing-a-development-branch | complete: local commit `617f7b6`; push and PR blocked, no git remote | roadmap F01 = shipped; constitution 1.1.0 Spec Evolution = flow-forward |
+
+Human decisions: identifier `app.devshelf.desktop` kept; remote: keep local commit until a remote is added.
+
+## project-registry
+
+| Step | Name | Agent | Status | Output |
+|---|---|---|---|---|
+| 1 | Spec | brainstorming | complete | docs/specs/project-registry/spec.md (approved; D1 nested allowed with note; D2 preview types; D3 tauri-plugin-dialog) |
+| 2 | Plan | writing-plans | complete | docs/specs/project-registry/plan.md |
+| 3 | Implement | task (Rust), frontend-developer (UI) | complete | branch `feature/project-registry` (cut from 617f7b6); not yet committed |
+| 4 | Review | code-reviewer | complete | 1 major (relative paths accepted), 8 minor, 3 nit; major and minor fixed (dead helpers removed, tag order, unique-violation code, async commands, stale nested note, picker copy, AGENTS.md); nits 3 and 4 kept (see notes) |
+| 5 | E2E | task (desktop run) | complete | docs/E2E-TESTS-F02.md: 24 PASS, 0 FAIL, 0 BLOCKED |
 | 6 | Manual Check | Human | pending (hard gate) | — |
 | 7 | Ship | finishing-a-development-branch | pending | — |
 
-Verification at Step 4 close: `npm run build` ok (158 modules); `npm run lint` ok; `npx vitest run` 4 files, 19 tests pass; `cargo test` 10 pass; `cargo build` no warnings from touched code.
+Verification at Step 4 close: `npm run build` ok (161 modules); `npm run lint` ok; `npx vitest run` 5 files, 32 tests; `cargo test` 34 pass; `cargo build` 0 warnings.
 
 Notes:
-- Spec clarification: AC-31 error branch in Settings is unreachable because S9 replaces the shell; Settings shows the storage row only in the OK state (plan, "Spec clarification").
-- Review nit 12: the Tauri identifier is `app.devshelf.desktop`, so the data folder is `%APPDATA%\app.devshelf.desktop`. Confirm this is the intended identifier before Ship.
-- Review nit 10: `appInfo()` in `src/lib/commands.ts` has no caller. Kept because `app_info` is a registered command; remove both if unwanted.
-- E2E gaps for the manual check: (a) AC-30, the second launch focusing an already-minimised first window was not observed; (b) Enter key on each sidebar item was observed on two items only; (c) Vault and Notes empty-state text is a heading without the preview's trailing period.
-- E2E modified the user's AppData folder during simulation (AC-24, AC-25) and restored it; the DB schema is unchanged (`app_meta`, user_version 1).
+- Migration 2 applied to the existing F01 database on launch (user_version 1 → 2). Backup: `%APPDATA%\app.devshelf.desktop\devshelf.sqlite3.f01-backup`.
+- E2E left test projects in the real data folder: App A, App A Sub, app b (pinned), App C. F02 has no delete (F15). To return to the F01 state, close the app and copy the backup over `devshelf.sqlite3`.
+- E2E: the picker's selection path was not exercised; only cancel was. Drive `F:` was not exercised; `%TEMP%` is on `C:`.
+- E2E observation: the inline error stays visible while the user edits the field until the next Register. Meets AC-16 as written; flagged for the Step 6 reviewer.
+- Review nit 3: the picker has no parent window, so it is not modal to the main window. Left as is.
+- Review nit 4: the 260-character limit counts chars, not UTF-16 units. Left as is.
+- Spec AC-33 wording was noise; implemented as row link to detail.

@@ -15,8 +15,6 @@ pub enum StorageError {
 }
 
 pub struct Storage {
-    // Retained for later features that read the connection (F02 onward).
-    #[allow(dead_code)]
     conn: Connection,
     schema_version: i64,
 }
@@ -30,6 +28,10 @@ impl std::fmt::Debug for Storage {
 }
 
 impl Storage {
+    pub fn connection(&self) -> &Connection {
+        &self.conn
+    }
+
     #[cfg(test)]
     pub fn schema_version(&self) -> i64 {
         self.schema_version
@@ -74,7 +76,7 @@ mod tests {
         let folder = tmp.path().join("a").join("b");
         let storage = open_in(&folder).unwrap();
         assert!(folder.join(DB_FILE_NAME).is_file());
-        assert_eq!(storage.schema_version(), 1);
+        assert_eq!(storage.schema_version(), 2);
     }
 
     #[test]
