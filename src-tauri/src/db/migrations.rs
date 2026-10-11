@@ -1,6 +1,6 @@
 use rusqlite_migration::{Migrations, M};
 
-pub const MIGRATIONS_COUNT: usize = 2;
+pub const MIGRATIONS_COUNT: usize = 3;
 
 pub fn migrations() -> Migrations<'static> {
     Migrations::new(vec![
@@ -21,6 +21,20 @@ CREATE TABLE project_tags (
   tag TEXT NOT NULL,
   PRIMARY KEY (project_id, tag)
 );",
+        ),
+        M::up(
+            "CREATE TABLE editor_profiles (
+  kind TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  exe_path TEXT NOT NULL DEFAULT '',
+  is_default INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO editor_profiles (kind, name, exe_path, is_default) VALUES
+  ('windows_default', 'Windows default', '', 1),
+  ('notepad_plus_plus', 'Notepad++', '', 0),
+  ('vs_code', 'VS Code', '', 0),
+  ('custom', 'Custom', '', 0);
+CREATE UNIQUE INDEX editor_one_default ON editor_profiles(is_default) WHERE is_default = 1;",
         ),
     ])
 }

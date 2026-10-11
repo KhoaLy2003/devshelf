@@ -19,6 +19,7 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let folder = app.path().app_data_dir().unwrap_or_default();
             app.manage(commands::storage::StorageState::open(folder));
@@ -32,7 +33,13 @@ pub fn run() {
             commands::projects::projects_register,
             commands::projects::projects_check_path,
             commands::projects::projects_set_pinned,
-            commands::projects::projects_pick_folder
+            commands::projects::projects_pick_folder,
+            commands::editors::editor_profiles_list,
+            commands::editors::editor_profiles_save,
+            commands::editors::editor_profiles_set_default,
+            commands::editors::editor_open,
+            commands::editors::editor_pick_executable,
+            commands::editors::editor_pick_item
         ])
         .run(tauri::generate_context!())
         .expect("error while running DevShelf");

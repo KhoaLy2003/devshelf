@@ -40,3 +40,41 @@ Notes:
 - Review nit 3: the picker has no parent window, so it is not modal to the main window. Left as is.
 - Review nit 4: the 260-character limit counts chars, not UTF-16 units. Left as is.
 - Spec AC-33 wording was noise; implemented as row link to detail.
+
+## project-registry (shipped)
+
+- Step 6 approved ("Approve for Ship"). Step 7: local commit `dd298ea` on `feature/project-registry`; roadmap F02 = shipped. Push and PR blocked: no git remote.
+
+## editor-profiles
+
+| Step | Name | Agent | Status | Output |
+|---|---|---|---|---|
+| 1 | Spec | brainstorming | complete | docs/specs/editor-profiles/spec.md (approved; D1 Open test in Settings; D2 tauri-plugin-opener; D3 no custom arguments) |
+| 2 | Plan | writing-plans | pending | — |
+| 3 | Implement | — | pending | — |
+| 4 | Review | code-reviewer | pending | — |
+| 5 | E2E | task | pending | — |
+| 6 | Manual Check | Human | pending (hard gate) | — |
+| 7 | Ship | finishing-a-development-branch | pending | — |
+
+Next: F03 Step 2 (plan) on a branch cut from `feature/project-registry`, then Steps 3–5.
+
+## editor-profiles
+
+| Step | Name | Agent | Status | Output |
+|---|---|---|---|---|
+| 1 | Spec | brainstorming | complete | docs/specs/editor-profiles/spec.md (approved; D1 Open test in Settings; D2 tauri-plugin-opener; D3 item path only) |
+| 2 | Plan | writing-plans | complete | docs/specs/editor-profiles/plan.md |
+| 3 | Implement | task (Rust), frontend-developer (UI) | complete | branch `feature/editor-profiles` (cut from dd298ea); not committed |
+| 4 | Review | code-reviewer | complete | 1 major (open-time error copy for deleted exe), 6 minor, 4 nit; major and minor fixed; nits F9 kept, F10 `_kind` kept, F11 noted for F04 |
+| 5 | E2E | task (dev-mode run) | complete with 1 FAIL fixed (C17 stale error after save); 21 PASS, 2 PARTIAL, 1 BLOCKED | docs/E2E-TESTS-F03.md |
+| 6 | Manual Check | Human | pending (hard gate) | — |
+| 7 | Ship | finishing-a-development-branch | pending | — |
+
+Verification at fix close: `npm run build` ok; `npm run lint` ok; `npx vitest run` 55 pass; `cargo test` 67 pass; `cargo build` 0 warnings.
+
+Open gaps for the Step 6 reviewer:
+- E2E ran against `tauri dev`, not the built app. Constitution P4 requires a smoke run on the built app before the phase closes. F01 and F02 used the same mode. A built-app run is still outstanding for all three features.
+- C17 (stale error after save) is fixed but the re-check was not re-run in E2E; only the build was verified after the fix.
+- C08b: the Notepad++ profile launch could not be observed. A copy of System32 notepad.exe exits with code 0 and shows no window. The spawn path is covered only by the Rust tests (argument vector, spaced path, spawned copy exits cleanly).
+- Set-default with an empty path is refused with AC-20 copy. Spec AC-05 reads as if this should succeed; this is a spec clarification to confirm.

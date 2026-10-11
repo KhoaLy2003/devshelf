@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { EditorOpenTest } from "../components/editor-open-test";
+import { EditorProfilesSection } from "../components/editor-profiles-section";
 import { storageStatus } from "../lib/commands";
 
 export function SettingsScreen() {
@@ -8,6 +10,8 @@ export function SettingsScreen() {
   return (
     <div>
       <h1 className="m-0 mb-8 text-3xl font-semibold">Settings</h1>
+      <EditorProfilesSection />
+      <EditorOpenTest />
       {data?.ok ? (
         <section className="mb-6 rounded-2xl border border-hairline bg-surface p-5">
           <p className="m-0 mb-1 font-medium">Storage: OK</p>

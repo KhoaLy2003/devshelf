@@ -101,3 +101,80 @@ export type ProjectPickFolderArgs = Record<string, never>;
 export interface ProjectPickFolderResult {
   path: string | null;
 }
+
+export type EditorCode =
+  | "profile_not_found"
+  | "profile_path_empty"
+  | "executable_not_found"
+  | "executable_invalid"
+  | "path_unsafe"
+  | "name_too_long"
+  | "item_not_found"
+  | "launch_failed"
+  | "storage_unavailable";
+
+// Rust (editors::KINDS) is authoritative; keep this list in sync.
+export const EDITOR_KINDS = ["windows_default", "notepad_plus_plus", "vs_code", "custom"] as const;
+
+export type EditorKind = (typeof EDITOR_KINDS)[number];
+
+export interface EditorProfileView {
+  kind: string;
+  name: string;
+  exe_path: string;
+  is_default: boolean;
+}
+
+export interface EditorProfileInputArgs {
+  kind: string;
+  name: string;
+  exe_path: string;
+}
+
+export interface EditorProfilesResult {
+  profiles: EditorProfileView[];
+  error: EditorCode | null;
+  kind: string | null;
+  detail: string | null;
+}
+
+export type EditorProfilesListArgs = Record<string, never>;
+
+export type EditorProfilesListResult = EditorProfilesResult;
+
+export interface EditorProfilesSaveArgs {
+  profiles: EditorProfileInputArgs[];
+}
+
+export type EditorProfilesSaveResult = EditorProfilesResult;
+
+export interface EditorSetDefaultArgs {
+  kind: string;
+}
+
+export type EditorSetDefaultResult = EditorProfilesResult;
+
+export interface EditorOpenArgs {
+  item_path: string;
+  kind: string | null;
+}
+
+export interface EditorOpenResult {
+  opened_name: string | null;
+  error: EditorCode | null;
+  kind: string | null;
+}
+
+export type EditorPickExecutableArgs = Record<string, never>;
+
+export interface EditorPickExecutableResult {
+  path: string | null;
+}
+
+export interface EditorPickItemArgs {
+  folder: boolean;
+}
+
+export interface EditorPickItemResult {
+  path: string | null;
+}
