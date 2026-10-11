@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DevShelf prototype</title>
+<!-- Prototype only: disposable code. No backend, no persistence, everything is mock data. -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  // Tailwind token mapping from docs/DESIGN.md (colors and font). Layout and component styling live in the <style> block below.
+  tailwind.config = {
+    theme: { extend: {
+      colors: {
+        canvas: '#000000', ink: '#ffffff', 'ink-muted': '#b2b6bd', 'ink-subtle': '#656a76',
+        'surface-1': '#15181e', 'surface-2': '#1f232b', 'surface-3': '#3b3d45',
+        hairline: '#3b3d45', 'hairline-soft': '#252830', 'accent-blue': '#2b89ff',
+        success: '#00ca8e', warning: '#ffcf25', error: '#e62b1e'
+      },
+      fontFamily: { sans: ['Geist', 'hashicorpSans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'helvetica', 'arial', 'sans-serif'] }
+    } }
+  };
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@500;600;700&family=Geist+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<style>
+:root {
+  --canvas:#000000; --ink:#ffffff; --ink-muted:#b2b6bd; --ink-subtle:#656a76;
+  --surface-1:#15181e; --surface-2:#1f232b; --surface-3:#3b3d45;
+  --hairline:#3b3d45; --hairline-soft:#252830; --hairline-card:rgba(178,182,189,.1);
+  --blue:#2b89ff; --success:#00ca8e; --warning:#ffcf25; --error:#e62b1e;
+  --r-xs:4px; --r-md:8px; --r-lg:12px; --r-xxl:24px; --r-pill:9999px;
+  --font:'Geist','hashicorpSans',-apple-system,BlinkMacSystemFont,'Segoe UI',helvetica,arial,sans-serif;
+  --mono:'Geist Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+}
+* { box-sizing:border-box; }
+html,body { margin:0; background:var(--canvas); color:var(--ink); font:500 16px/1.5 var(--font); min-height:100dvh; }
+button,input,select,textarea { font:inherit; color:inherit; }
+a { color:var(--blue); text-decoration:none; cursor:pointer; }
+a:hover { text-decoration:underline; }
+.app { display:grid; grid-template-columns:248px 1fr; min-height:100dvh; max-width:1440px; margin:0 auto; }
+/* sidebar */
+.side { position:sticky; top:0; height:100dvh; display:flex; flex-direction:column; padding:24px 16px; border-right:1px solid var(--hairline-soft); background:var(--canvas); }
+.brand { display:flex; align-items:center; gap:12px; padding:0 8px 24px; font:700 20px/1.2 var(--font); letter-spacing:-.4px; }
+.brand i { font-size:24px; }
+.sbtn { display:flex; align-items:center; gap:8px; width:100%; padding:10px 12px; margin-bottom:16px; background:var(--surface-1); border:1px solid var(--hairline-card); border-radius:var(--r-md); color:var(--ink-muted); font:500 14px/1.29 var(--font); cursor:pointer; }
+.sbtn:hover { background:var(--surface-2); }
+.sbtn kbd { margin-left:auto; font:500 12px var(--font); color:var(--ink-subtle); border:1px solid var(--hairline); border-radius:var(--r-xs); padding:1px 6px; }
+.nav { display:flex; flex-direction:column; gap:4px; }
+.nav a { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:var(--r-md); color:var(--ink-muted); font:600 14px/1.29 var(--font); }
+.nav a i { font-size:20px; }
+.nav a:hover { background:var(--surface-1); color:var(--ink); text-decoration:none; }
+.nav a.on { background:var(--surface-2); color:var(--ink); }
+.nav .tag { margin-left:auto; font-size:12px; color:var(--ink-subtle); }
+.side-foot { margin-top:auto; }
+.demo { margin-top:12px; padding:16px; background:var(--surface-1); border:1px solid var(--hairline-card); border-radius:var(--r-lg); font-size:13px; line-height:1.38; }
+.demo h4 { margin:0 0 8px; font:600 12px/1.23 var(--font); letter-spacing:.6px; text-transform:uppercase; color:var(--ink-muted); }
+.demo label { display:flex; gap:8px; align-items:center; padding:6px 0; color:var(--ink-muted); cursor:pointer; }
+/* main */
+main { padding:40px 48px 96px; min-width:0; }
+.wrap { max-width:1040px; }
+main h1 { margin:0 0 8px; font:600 40px/1.19 var(--font); letter-spacing:-1px; }
+main h2, .modal h2 { margin:0 0 16px; font:600 22px/1.18 var(--font); letter-spacing:-.4px; }
+main h3 { margin:0 0 4px; font:600 16px/1.3 var(--font); }
+.lead { margin:0 0 32px; max-width:62ch; color:var(--ink-muted); font-size:18px; line-height:1.69; }
+.eyebrow { margin:0 0 12px; font:600 12px/1.23 var(--font); letter-spacing:.6px; text-transform:uppercase; color:var(--ink-muted); }
+.muted { color:var(--ink-muted); } .subtle { color:var(--ink-subtle); }
+.small { font-size:14px; line-height:1.71; } .caption { font-size:13px; line-height:1.38; letter-spacing:.2px; }
+.mono { font-family:var(--mono); font-size:13px; letter-spacing:0; }
+.row { display:flex; align-items:center; gap:12px; } .wrapx { flex-wrap:wrap; }
+.sp { flex:1; }
+.section { margin-bottom:48px; }
+/* buttons */
+.btn { display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border-radius:var(--r-md); border:1px solid transparent; font:600 14px/1.29 var(--font); cursor:pointer; white-space:nowrap; transition:transform .08s; }
+.btn:active { transform:translateY(1px); }
+.btn i { font-size:18px; }
+.btn.primary { background:#fff; color:#000; }
+.btn.primary:hover { background:#e6e8ec; }
+.btn.secondary { background:var(--surface-2); color:var(--ink); border-color:var(--hairline); }
+.btn.secondary:hover { background:var(--surface-3); }
+.btn.ghost { background:var(--canvas); color:var(--ink); border-color:var(--hairline); }
+.btn.ghost:hover { background:var(--surface-1); }
+.btn.sm { padding:6px 12px; font-size:13px; } .btn.sm i { font-size:16px; }
+.btn[disabled] { opacity:.4; cursor:not-allowed; }
+:focus-visible { outline:1px solid var(--blue); outline-offset:2px; }
+/* surfaces */
+.card { background:var(--surface-1); border:1px solid var(--hairline-card); border-radius:var(--r-lg); padding:24px; }
+.card.sm { padding:16px; }
+.card.lift { background:var(--surface-2); border-color:var(--hairline); }
+.grid2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.list { background:var(--surface-1); border:1px solid var(--hairline-card); border-radius:var(--r-lg); overflow:hidden; }
+.li { display:flex; align-items:center; gap:16px; padding:16px 24px; }
+.li + .li { border-top:1px solid var(--hairline-soft); }
+.li.click { cursor:pointer; } .li.click:hover { background:var(--surface-2); }
+.li.hl { background:var(--surface-2); }
+.li.col { display:block; }
+.detail { padding:0 24px 24px; background:var(--surface-1); }
+.kv { display:grid; grid-template-columns:140px 1fr; gap:8px 16px; font-size:14px; }
+.kv dt { color:var(--ink-subtle); } .kv dd { margin:0; }
+/* pills */
+.pill { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:var(--r-pill); background:var(--surface-2); border:1px solid var(--hairline); color:var(--ink-muted); font:500 12px/1.38 var(--font); letter-spacing:.2px; white-space:nowrap; }
+.pill.ok { color:var(--success); border-color:rgba(0,202,142,.4); background:transparent; }
+.pill.bad { color:#ff6b61; border-color:rgba(230,43,30,.55); background:transparent; }
+.pill.warn { color:var(--warning); border-color:rgba(255,207,37,.45); background:transparent; }
+/* forms */
+.field { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+.field label { font:600 13px/1.38 var(--font); color:var(--ink-muted); }
+.in, select.in, textarea.in { width:100%; padding:10px 14px; background:var(--surface-1); border:1px solid var(--hairline); border-radius:var(--r-md); color:var(--ink); }
+.in::placeholder { color:var(--ink-subtle); }
+.in:focus { outline:1px solid var(--blue); border-color:var(--blue); }
+.in.err { border-color:var(--error); }
+select.in { appearance:none; background-image:linear-gradient(45deg,transparent 50%,var(--ink-muted) 50%),linear-gradient(135deg,var(--ink-muted) 50%,transparent 50%); background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%; background-size:5px 5px; background-repeat:no-repeat; padding-right:34px; background-color:var(--surface-1); }
+.errtext { color:#ff6b61; font-size:13px; line-height:1.38; display:flex; gap:6px; align-items:flex-start; }
+.helper { color:var(--ink-subtle); font-size:13px; }
+.filters { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:12px; }
+.chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; min-height:28px; }
+.chip { display:inline-flex; align-items:center; gap:6px; padding:3px 6px 3px 12px; border-radius:var(--r-pill); background:var(--surface-2); border:1px solid var(--hairline); font-size:13px; }
+.chip button { background:none; border:0; color:var(--ink-muted); cursor:pointer; display:grid; place-items:center; padding:2px; border-radius:50%; }
+.chip button:hover { color:var(--ink); }
+/* notices */
+.notice { display:flex; gap:12px; padding:16px; border-radius:var(--r-md); background:var(--surface-1); border:1px solid var(--hairline); font-size:14px; line-height:1.6; }
+.notice i { font-size:20px; margin-top:1px; }
+.notice.ok { border-color:rgba(0,202,142,.45); } .notice.ok i { color:var(--success); }
+.notice.bad { border-color:rgba(230,43,30,.55); } .notice.bad i { color:#ff6b61; }
+.notice.warn { border-color:rgba(255,207,37,.45); } .notice.warn i { color:var(--warning); }
+.empty { padding:48px 24px; text-align:center; background:var(--surface-1); border:1px dashed var(--hairline); border-radius:var(--r-lg); }
+.empty p { margin:0 auto 16px; max-width:46ch; color:var(--ink-muted); }
+.crumb { margin-bottom:24px; font-size:14px; }
+/* modal, palette, toast */
+.scrim { position:fixed; inset:0; background:rgba(0,0,0,.72); display:flex; justify-content:center; align-items:flex-start; padding-top:12vh; z-index:50; }
+.modal { width:min(540px,92vw); background:var(--surface-1); border:1px solid var(--hairline); border-radius:var(--r-lg); padding:24px; max-height:80vh; overflow:auto; }
+.pal { width:min(620px,92vw); background:var(--surface-1); border:1px solid var(--hairline); border-radius:var(--r-lg); overflow:hidden; }
+.pal input { width:100%; padding:18px 24px; background:var(--surface-1); border:0; border-bottom:1px solid var(--hairline-soft); color:var(--ink); font-size:16px; }
+.pal input:focus { outline:none; }
+.pal-list { max-height:48vh; overflow:auto; padding:8px; }
+.pal-grp { padding:10px 12px 4px; font:600 12px/1.23 var(--font); letter-spacing:.6px; text-transform:uppercase; color:var(--ink-subtle); }
+.pal-it { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:var(--r-md); cursor:pointer; }
+.pal-it.on { background:var(--surface-2); }
+.toast { position:fixed; right:24px; bottom:24px; display:flex; gap:10px; align-items:center; padding:12px 18px; background:var(--surface-2); border:1px solid var(--hairline); border-radius:var(--r-md); font-size:14px; z-index:70; max-width:440px; }
+.toast i { font-size:20px; color:var(--success); }
+.toast.bad i { color:#ff6b61; }
+/* vault */
+.lockbox { max-width:460px; }
+.secret { font-family:var(--mono); font-size:13px; letter-spacing:0; }
+.menu { position:absolute; right:0; top:100%; margin-top:4px; min-width:180px; background:var(--surface-2); border:1px solid var(--hairline); border-radius:var(--r-md); padding:4px; z-index:20; }
+.menu button { display:block; width:100%; text-align:left; background:none; border:0; padding:8px 12px; border-radius:var(--r-xs); font-size:14px; cursor:pointer; }
+.menu button:hover { background:var(--surface-3); }
+.rel { position:relative; }
+/* notes */
+.split { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.wrap.wide { max-width:none; }
+.ta { min-height:max(420px, calc(100dvh - 300px)); resize:vertical; font-family:var(--mono); font-size:14px; line-height:1.7; }
+.md { padding:16px 20px; background:var(--surface-1); border:1px solid var(--hairline-card); border-radius:var(--r-md); min-height:max(420px, calc(100dvh - 300px)); font-size:15px; line-height:1.6; overflow:auto; }
+.md h1 { font-size:24px; font-weight:600; margin:0 0 12px; letter-spacing:-.4px; } .md h2 { font-size:18px; font-weight:600; margin:20px 0 8px; }
+.md ul { list-style:disc; padding-left:20px; margin:8px 0; } .md ol { list-style:decimal; padding-left:20px; margin:8px 0; } .md li { margin:4px 0; } .md ul li.task { list-style:none; margin-left:-20px; }
+.md pre { background:var(--canvas); border:1px solid var(--hairline-soft); border-radius:var(--r-md); padding:12px; overflow:auto; }
+.md code { font-family:var(--mono); font-size:13px; background:var(--surface-2); padding:1px 6px; border-radius:var(--r-xs); }
+.md pre code { background:none; padding:0; }
+.md .done { color:var(--ink-subtle); text-decoration:line-through; }
+.save { display:inline-flex; align-items:center; gap:6px; font-size:13px; }
+.save.saved { color:var(--success); } .save.unsaved { color:var(--warning); } .save.fail { color:#ff6b61; }
+.radio-row { display:flex; align-items:center; gap:16px; padding:16px 24px; }
+.radio-row + .radio-row { border-top:1px solid var(--hairline-soft); }
+input[type=radio], input[type=checkbox] { accent-color:#fff; width:16px; height:16px; }
+@media (max-width:1024px) { .app { grid-template-columns:200px 1fr; } main { padding:32px 24px 64px; } .filters { grid-template-columns:repeat(2,minmax(0,1fr)); } .split, .grid2 { grid-template-columns:1fr; } }
+@media (max-width:768px) { .app { grid-template-columns:1fr; } .side { position:static; height:auto; border-right:0; border-bottom:1px solid var(--hairline-soft); } .nav { flex-direction:row; flex-wrap:wrap; } .side-foot { display:none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" id="side"></aside>
+  <main><div class="wrap" id="view"></div></main>
+</div>
+<div id="modal"></div>
+<div id="palette"></div>
+<div id="toast"></div>
+
+<script>
+// ---------------------------------------------------------------- mock data (see docs/prototype/prototype-brief.md section 4)
+const TODAY = '2026-10-12', NOW = '09:04';
+const BASE_PROJECTS = [
+  { id:'p1', name:'orders-api', type:'Spring Boot API', root:'D:\\work\\acme\\orders-api', tags:['java','backend','acme'], pinned:true },
+  { id:'p2', name:'billing-service', type:'Spring Boot API', root:'D:\\work\\acme\\billing-service', tags:['java','backend','acme'], pinned:true },
+  { id:'p3', name:'ops-dashboard', type:'React dashboard', root:'C:\\Users\\khoa\\dev\\ops-dashboard', tags:['react','frontend'], pinned:true },
+  { id:'p4', name:'infra-compose', type:'Docker / reverse proxy', root:'F:\\infra\\compose-stack', tags:['docker','caddy','nginx'], pinned:true },
+  { id:'p6', name:'legacy-portal', type:'PHP site (archived)', root:'F:\\archive\\legacy-portal', tags:['legacy'], pinned:false },
+];
+const NEW_PROJECT_PATH = 'F:\\sandbox\\notify-worker';
+const R = 'src\\main\\resources\\';
+const BASE_FILES = [
+  { id:'c1', name:'application-local.yml', env:'local', kind:'YAML', path:'D:\\work\\acme\\orders-api\\'+R+'application-local.yml' },
+  { id:'c2', name:'application-dev.yml', env:'dev', kind:'YAML', path:'D:\\work\\acme\\orders-api\\'+R+'application-dev.yml' },
+  { id:'c3', name:'application-staging.yml', env:'staging', kind:'YAML', path:'D:\\work\\acme\\orders-api\\'+R+'application-staging.yml' },
+  { id:'c4', name:'application-production.yml', env:'production', kind:'YAML', path:'D:\\work\\acme\\orders-api\\'+R+'application-production.yml' },
+  { id:'c5', name:'.env.staging', env:'staging', kind:'.env', path:'D:\\work\\acme\\orders-api\\.env.staging' },
+  { id:'c6', name:'staging-override.env', env:'staging', kind:'.env', path:'D:\\work\\acme\\orders-api\\deploy\\staging-override.env' },
+  { id:'c7', name:'application-staging.yml', env:'staging', kind:'YAML', path:'D:\\work\\acme\\billing-service\\'+R+'application-staging.yml' },
+  { id:'c8', name:'application.properties', env:'dev', kind:'Properties', path:'D:\\work\\acme\\billing-service\\'+R+'application.properties' },
+  { id:'c9', name:'.env.local', env:'local', kind:'.env', path:'C:\\Users\\khoa\\dev\\ops-dashboard\\.env.local' },
+  { id:'c10', name:'docker-compose.staging.yml', env:'staging', kind:'Docker Compose', path:'F:\\infra\\compose-stack\\docker-compose.staging.yml' },
+  { id:'c11', name:'docker-compose.prod.yml', env:'production', kind:'Docker Compose', path:'F:\\infra\\compose-stack\\docker-compose.prod.yml' },
+  { id:'c12', name:'Caddyfile', env:'production', kind:'Caddy/Nginx', path:'F:\\infra\\compose-stack\\caddy\\Caddyfile' },
+  { id:'c13', name:'notify.conf', env:'dev', kind:'Caddy/Nginx', path:'F:\\infra\\compose-stack\\nginx\\conf.d\\notify.conf' },
+  { id:'c14', name:'.env.production', env:'production', kind:'.env', path:'D:\\work\\acme\\billing-service\\.env.production' },
+];
+const EDITORS = { vscode:'VS Code', npp:'Notepad++', win:'Windows default' };
+const WS = [
+  { id:'w1', name:'Orders API staging deploy fix', last:'2026-10-09 17:42', lastMissing:1, items:[
+    { name:'application-staging.yml', path:'D:\\work\\acme\\orders-api\\'+R+'application-staging.yml', ed:'vscode' },
+    { name:'.env.staging', path:'D:\\work\\acme\\orders-api\\.env.staging', ed:'npp' },
+    { name:'staging-override.env', path:'D:\\work\\acme\\orders-api\\deploy\\staging-override.env', ed:'npp' },
+    { name:'docker-compose.staging.yml', path:'F:\\infra\\compose-stack\\docker-compose.staging.yml', ed:'vscode' },
+    { name:'Caddyfile', path:'F:\\infra\\compose-stack\\caddy\\Caddyfile', ed:'npp' },
+    { name:'application-staging.yml', path:'D:\\work\\acme\\billing-service\\'+R+'application-staging.yml', ed:'vscode' },
+    { name:'staging-rollout-2026-10.txt', path:'C:\\Users\\khoa\\Documents\\deploy-notes\\staging-rollout-2026-10.txt', ed:'win' } ] },
+  { id:'w2', name:'Dashboard local setup', last:'2026-10-07 09:15', lastMissing:0, items:[
+    { name:'.env.local', path:'C:\\Users\\khoa\\dev\\ops-dashboard\\.env.local', ed:'npp' },
+    { name:'vite.config.ts', path:'C:\\Users\\khoa\\dev\\ops-dashboard\\vite.config.ts', ed:'vscode' },
+    { name:'package.json', path:'C:\\Users\\khoa\\dev\\ops-dashboard\\package.json', ed:'vscode' },
+    { name:'src\\api', folder:true, path:'C:\\Users\\khoa\\dev\\ops-dashboard\\src\\api', ed:'win' },
+    { name:'application-local.yml', path:'D:\\work\\acme\\orders-api\\'+R+'application-local.yml', ed:'vscode' } ] },
+  { id:'w3', name:'Notify worker incident review', last:'2026-10-03 22:10', lastMissing:0, items:[
+    { name:'.env.production', path:'F:\\sandbox\\notify-worker\\.env.production', ed:'npp' },
+    { name:'docker-compose.prod.yml', path:'F:\\infra\\compose-stack\\docker-compose.prod.yml', ed:'vscode' },
+    { name:'notify.conf', path:'F:\\infra\\compose-stack\\nginx\\conf.d\\notify.conf', ed:'npp' },
+    { name:'incident-2026-10-03.md', path:'D:\\work\\acme\\billing-service\\docs\\incident-2026-10-03.md', ed:'win' } ] },
+];
+const HINT_PATH = 'D:\\work\\acme\\orders-api\\deploy\\staging.override.env';
+const MASK = '\u2022'.repeat(16);
+const SECRETS = [
+  { id:'s1', label:'orders-api staging API key', type:'API key', project:'orders-api', env:'staging', value:'sk_test_FAKE_orders_staging_0001', upd:'2026-10-01' },
+  { id:'s2', label:'orders-api staging DB password', type:'Database password', project:'orders-api', env:'staging', value:'demo-pass-not-real-4821', upd:'2026-09-28' },
+  { id:'s3', label:'billing-service payment webhook secret', type:'Webhook signing secret', project:'billing-service', env:'staging', value:'whsec_FAKE_billing_00aa11', upd:'2026-10-05' },
+  { id:'s4', label:'ops-dashboard Sentry token', type:'Access token', project:'ops-dashboard', env:'local', value:'sntrys_FAKE_dashboard_0007', upd:'2026-09-19' },
+  { id:'s5', label:'infra-compose registry credential', type:'Container registry login', project:'infra-compose', env:'production', value:'registry-fake-token-9c3d', upd:'2026-10-02' },
+  { id:'s6', label:'notify-worker queue connection string', type:'Connection string', project:'notify-worker', env:'production', value:'amqp://demo:FAKE@localhost:5672/demo', upd:'2026-10-03' },
+  { id:'s7', label:'F: deploy key passphrase', type:'SSH passphrase', project:'', env:'', value:'fake-passphrase-for-demo', upd:'2026-08-30' },
+];
+const NOTES = [
+  { id:'n1', title:'orders-api: staging rollout log', project:'orders-api', edited:'2026-10-09 18:05', body:[
+    '# orders-api: staging rollout log','','## Rollout steps','- [x] Back up application-staging.yml','- [x] Confirm .env.staging matches the checklist','- [x] Pull the new image on the staging host','- [ ] Run the smoke test against /health','- [ ] Notify the deploys channel','','## Command','```','docker compose -f docker-compose.staging.yml up -d orders-api','```','','## Open issues','- staging-override.env was renamed; the workspace still points to the old name','- DB pool size is still 10 on staging'].join('\n') },
+  { id:'n2', title:'Checklist: before every production deploy', project:'', edited:'2026-10-02 10:20', body:[
+    '# Before every production deploy','','1. Back up the current config','2. Check the env file for the target environment','3. Notify the team channel','4. Open the smoke test URL and confirm it responds'].join('\n') },
+  { id:'n3', title:'billing-service: webhook debugging', project:'billing-service', edited:'2026-10-05 21:40', body:[
+    '# billing-service: webhook debugging','','## Observations','- Signature mismatch only on retried deliveries','- Raw body is re-serialised before verification','','## Log excerpt','```','WARN  WebhookVerifier  signature mismatch id=evt_demo_204 attempt=2','```','','## Next steps','- [ ] Verify against the raw request bytes','- [ ] Add a regression test for retries'].join('\n') },
+  { id:'n4', title:'infra-compose: Caddy TLS renewal', project:'infra-compose', edited:'2026-09-26 08:55', body:[
+    '# Caddy TLS renewal','','## Steps','- Check expiry for each domain','- Restart the caddy service after a manual renewal','','## Domains','- staging.acme-demo.test, expires 2026-12-01','- api.acme-demo.test, expires 2027-01-14'].join('\n') },
+  { id:'n5', title:'ops-dashboard: local setup guide', project:'ops-dashboard', edited:'2026-09-18 14:30', body:[
+    '# ops-dashboard: local setup','','## Install','1. Install dependencies with `npm install`','2. Create `.env.local`','3. Start with `npm run dev`','','## Required keys in .env.local','- VITE_API_BASE','- VITE_SENTRY_DSN'].join('\n') },
+];
+
+// ---------------------------------------------------------------- state
+const S = {
+  empty:false, driveF:false,
+  added:[], missing:new Set([WS[0].items[2].path]), ack:new Set(),
+  files:BASE_FILES.map(f=>({...f})), ws:WS, notes:NOTES, secrets:SECRETS,
+  expanded:null, hl:null, dialog:null,
+  restore:null, relink:null, relinkErr:'',
+  cfg:{project:'',env:'',kind:'',status:''}, cfgMsg:null, cfgMenu:null, cfgRelink:null, cfgRelinkErr:'',
+  noteFilter:'', saveFail:false, saveState:'saved', saveTime:'', saveTimer:null,
+  vault:{ unlocked:false, attempts:0, msg:'', secs:300, revealed:{}, fp:'', ft:'' },
+  saved:{ def:'vscode', timeout:5, paths:{ vscode:'C:\\Users\\khoa\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe', npp:'C:\\Program Files\\Notepad++\\notepad++.exe', win:'' } },
+  draft:null, settingsErr:'', settingsOk:false,
+  pal:null,
+};
+S.draft = JSON.parse(JSON.stringify(S.saved));
+const projects = () => (S.empty ? [] : BASE_PROJECTS).concat(S.added);
+const files = () => S.empty ? [] : S.files;
+const wsList = () => S.empty ? [] : S.ws;
+const notes = () => S.empty ? [] : S.notes;
+const secrets = () => S.empty ? [] : S.secrets;
+const projectOf = p => { let best=null; projects().forEach(x=>{ if(p.toLowerCase().startsWith(x.root.toLowerCase()+'\\') || p.toLowerCase()===x.root.toLowerCase()){ if(!best||x.root.length>best.root.length) best=x; }}); return best; };
+const knownPaths = () => { const s=new Set([HINT_PATH, NEW_PROJECT_PATH]); S.ws.forEach(w=>w.items.forEach(i=>s.add(i.path.toLowerCase()))); S.files.forEach(f=>s.add(f.path.toLowerCase())); s.add(HINT_PATH.toLowerCase()); s.add(NEW_PROJECT_PATH.toLowerCase()); BASE_PROJECTS.forEach(p=>s.add(p.root.toLowerCase())); return s; };
+function pathStatus(p){ if(S.missing.has(p)) return 'missing'; if(S.driveF && /^F:/i.test(p)) return 'inaccessible'; return 'available'; }
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const base = p => p.split('\\').pop();
+const $ = s => document.querySelector(s);
+const ic = n => `<i class="ph ph-${n}"></i>`;
+const defaultEd = () => EDITORS[S.saved.def];
+
+// ---------------------------------------------------------------- helpers
+let toastT;
+function toast(msg, bad){ $('#toast').innerHTML = `<div class="toast ${bad?'bad':''}" role="status">${ic(bad?'warning-circle':'check-circle')}<span>${esc(msg)}</span></div>`; clearTimeout(toastT); toastT = setTimeout(()=>$('#toast').innerHTML='', 3200); }
+function statusPill(st){ return st==='available'?`<span class="pill ok">${ic('check-circle')}Available</span>`: st==='missing'?`<span class="pill bad">${ic('x-circle')}Missing</span>`:`<span class="pill warn">${ic('warning')}Inaccessible</span>`; }
+function reason(st, p){ return st==='missing' ? `${p} was not found. It may have been renamed or moved.` : `Drive F: is not reachable right now, so ${p} cannot be read.`; }
+function renderSideAndView(){ renderSide(); render(); }
+
+// ---------------------------------------------------------------- routing
+const NAV = [['home','Home','house'],['projects','Projects','folders'],['workspaces','Workspaces','stack'],['config','Config Catalog','file-text'],['vault','Vault','lock-key'],['notes','Notes','note-pencil'],['settings','Settings','gear-six']];
+function route(){ const h = location.hash.replace(/^#\/?/,'').split('/'); return { page:h[0]||'home', id:h[1]||null }; }
+function renderSide(){
+  const r = route();
+  $('#side').innerHTML = `
+    <div class="brand">${ic('books')}<span>DevShelf</span></div>
+    <button class="sbtn" data-act="pal-open">${ic('magnifying-glass')}Quick open<kbd>Ctrl K</kbd></button>
+    <nav class="nav" aria-label="Main">${NAV.map(([k,l,i])=>`<a href="#/${k}" class="${r.page===k?'on':''}">${ic(i)}${l}${k==='vault'?`<span class="tag">${S.vault.unlocked?'Unlocked':'Locked'}</span>`:''}</a>`).join('')}</nav>
+    <div class="side-foot">
+      <button class="sbtn" style="margin-bottom:0" data-act="demo-toggle">${ic('flask')}Demo states</button>
+      ${S.demoOpen?`<div class="demo"><h4>Demo states</h4>
+        <label><input type="radio" name="ds" value="full" ${S.empty?'':'checked'} data-act="ds-full"> Full data</label>
+        <label><input type="radio" name="ds" value="empty" ${S.empty?'checked':''} data-act="ds-empty"> Empty data</label>
+        <label><input type="checkbox" ${S.driveF?'checked':''} data-act="drive-toggle"> Simulate Drive F: unreachable</label></div>`:''}
+    </div>`;
+}
+function render(){
+  const r = route(); const v = $('#view');
+  const fn = { home:vHome, projects:vProjects, workspaces:vWorkspaces, config:vConfig, vault:vVault, notes:vNotes, settings:vSettings }[r.page] || vHome;
+  v.innerHTML = fn(r); v.classList.toggle('wide', r.page==='notes' && !!r.id);
+  const af = v.querySelector('[autofocus]'); if(af) af.focus();
+  if(r.page==='notes' && r.id) noteBind();
+}
+window.addEventListener('hashchange', ()=>{ S.restore=null; S.relink=null; S.cfgMenu=null; S.cfgMsg=null; S.cfgRelink=null; const r=route(); if(r.page==='projects') S.expanded=r.id||S.expanded; renderSideAndView(); window.scrollTo(0,0); });
+
+// ---------------------------------------------------------------- Home (F1)
+function vHome(){
+  const ps = projects().filter(p=>p.pinned), ws = wsList().slice().sort((a,b)=>b.last.localeCompare(a.last));
+  if(!ps.length && !ws.length) return `<h1>Home</h1><p class="lead">Pick up where you left off.</p>
+    <div class="empty"><h2>Nothing here yet</h2><p>Register a project and save a workspace to see pinned projects and recent workspaces on this page.</p><button class="btn primary" data-act="dlg-open">${ic('plus')}Register your first project</button></div>`;
+  return `<h1>Good morning, Khoa</h1><p class="lead">Monday 12 October 2026. Reopen a workspace, or jump to anything with quick open.</p>
+    <div class="row wrapx section"><button class="btn primary" data-act="dlg-open">${ic('plus')}Register project</button><button class="btn secondary" data-act="pal-open">${ic('magnifying-glass')}Quick open (Ctrl+K)</button></div>
+    <section class="section"><p class="eyebrow">Recent workspaces</p>
+      <div class="list">${ws.map(w=>{ const pr=[...new Set(w.items.map(i=>projectOf(i.path)).filter(Boolean).map(p=>p.name))];
+        return `<div class="li click" data-go="#/workspaces/${w.id}"><div><h3>${esc(w.name)}</h3><div class="small muted">${w.items.length} items, ${esc(pr.join(', ')||'no registered projects')}</div></div><div class="sp"></div>${w.lastMissing?`<span class="pill warn">${ic('warning')}${w.lastMissing} item missing at last restore</span>`:''}<span class="caption subtle">Last used ${esc(w.last)}</span>${ic('caret-right')}</div>`; }).join('')}</div></section>
+    <section class="section"><p class="eyebrow">Pinned projects</p>
+      <div class="grid2">${ps.map(p=>`<div class="card sm li click" style="border-radius:12px" data-go="#/projects/${p.id}">${ic('push-pin')}<div><h3>${esc(p.name)}</h3><div class="mono subtle">${esc(p.root)}</div></div></div>`).join('')}</div></section>`;
+}
+
+// ---------------------------------------------------------------- Projects (F2)
+function vProjects(r){
+  const ps = projects();
+  const body = !ps.length ? `<div class="empty"><h2>No projects registered yet</h2><p>A project is a reference to a folder. DevShelf never copies or changes your files.</p><button class="btn primary" data-act="dlg-open">${ic('plus')}Register project</button></div>` :
+  `<div class="list">${ps.map(p=>{ const open=S.expanded===p.id; const nf=files().filter(f=>projectOf(f.path)===p).length, nn=notes().filter(n=>n.project===p.name).length, ns=secrets().filter(s=>s.project===p.name).length;
+    return `<div class="li col ${S.hl===p.id?'hl':''}" style="padding:0"><div class="li click ${open?'hl':''}" data-act="proj-toggle" data-id="${p.id}" style="border-top:0"><div>${p.pinned?ic('push-pin')+' ':''}<strong>${esc(p.name)}</strong><div class="mono subtle">${esc(p.root)}</div></div><div class="sp"></div><span class="row" style="gap:6px">${p.tags.map(t=>`<span class="pill">${esc(t)}</span>`).join('')}</span><span class="caption subtle" style="min-width:150px;text-align:right">${esc(p.type)} on ${p.root[0]}:</span>${ic(open?'caret-up':'caret-down')}</div>
+    ${open?`<div class="detail"><dl class="kv"><dt>Root path</dt><dd class="mono">${esc(p.root)}</dd><dt>Type</dt><dd>${esc(p.type)}</dd><dt>Registered files</dt><dd>${nf} config files in the catalog</dd><dt>Linked notes</dt><dd>${nn}</dd><dt>Linked secrets</dt><dd>${ns}</dd></dl></div>`:''}</div>`; }).join('')}</div>`;
+  return `<h1>Projects</h1><p class="lead">Registered project folders. Registration stores a reference only.</p>
+    <div class="row section"><button class="btn primary" data-act="dlg-open">${ic('plus')}Register project</button></div>${body}`;
+}
+function dlgHtml(){
+  const d=S.dialog; if(!d) return '';
+  const e=d.errors||{};
+  return `<div class="scrim" data-act="dlg-scrim"><div class="modal" role="dialog" aria-modal="true" aria-label="Register project">
+    <h2>Register project</h2>
+    <div class="field"><label for="d-path">Root folder path</label><div class="row"><input id="d-path" class="in mono ${e.path?'err':''}" data-d="path" value="${esc(d.path)}" placeholder="D:\\work\\my-project" autofocus><button class="btn secondary" data-act="dlg-browse">${ic('folder-open')}Browse...</button></div>${e.path?`<div class="errtext">${ic('warning-circle')}${esc(e.path)}</div>`:''}</div>
+    <div class="field"><label for="d-name">Display name</label><input id="d-name" class="in ${e.name?'err':''}" data-d="name" value="${esc(d.name)}" placeholder="notify-worker">${e.name?`<div class="errtext">${ic('warning-circle')}${esc(e.name)}</div>`:''}</div>
+    <div class="field"><label for="d-type">Type</label><select id="d-type" class="in" data-d="type">${['Spring Boot API','React dashboard','Docker / reverse proxy','Node worker','Other'].map(t=>`<option ${d.type===t?'selected':''}>${t}</option>`).join('')}</select></div>
+    <div class="field"><label for="d-tags">Tags</label><input id="d-tags" class="in" data-d="tags" value="${esc(d.tags)}" placeholder="node, queue"><span class="helper">Separate tags with commas.</span></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="dlg-close">Cancel</button><button class="btn primary" data-act="dlg-save">Register</button></div></div></div>`;
+}
+function dlgDraw(){ $('#modal').innerHTML = dlgHtml(); const af=$('#modal [autofocus]'); if(af) af.focus(); }
+function dlgSave(){
+  const d=S.dialog, e={}; const p=d.path.trim();
+  if(!p) e.path='Enter or pick a project folder.';
+  else { const ex=projects().find(x=>x.root.toLowerCase()===p.toLowerCase());
+    if(ex) e.path=`${ex.root} is already registered as ${ex.name}.`;
+    else if(!knownPaths().has(p.toLowerCase())) e.path=`Folder ${p} was not found.`; }
+  if(!d.name.trim()) e.name='Enter a display name.';
+  d.errors=e; if(Object.keys(e).length){ dlgDraw(); return; }
+  const np={ id:'p5', name:d.name.trim(), type:d.type, root:p, tags:d.tags.split(',').map(t=>t.trim()).filter(Boolean), pinned:false };
+  S.added.push(np); S.expanded=np.id; S.hl=np.id; S.dialog=null; $('#modal').innerHTML='';
+  if(route().page!=='projects') location.hash='#/projects'; else renderSideAndView();
+  toast(`Project ${np.name} registered. No project files were copied or changed.`);
+}
+
+// ---------------------------------------------------------------- Workspaces (F3)
+function vWorkspaces(r){
+  const list = wsList();
+  if(r.id){ const w=list.find(x=>x.id===r.id); if(w) return vWsDetail(w); }
+  if(!list.length) return `<h1>Workspaces</h1><p class="lead">Named, ordered sets of files you reopen together.</p><div class="empty"><p>No workspaces yet. A workspace saves an ordered set of files to reopen together.</p></div>`;
+  return `<h1>Workspaces</h1><p class="lead">Named, ordered sets of files you reopen together.</p><div class="list">${list.map(w=>{ const pr=[...new Set(w.items.map(i=>projectOf(i.path)).filter(Boolean).map(p=>p.name))];
+    return `<div class="li click" data-go="#/workspaces/${w.id}"><div><h3>${esc(w.name)}</h3><div class="small muted">${esc(pr.join(', ')||'No registered projects')}</div></div><div class="sp"></div><span class="pill">${w.items.length} items</span><span class="caption subtle">Last used ${esc(w.last)}</span>${ic('caret-right')}</div>`; }).join('')}</div>`;
+}
+function itemStatus(i){ return pathStatus(i.path); }
+function vWsDetail(w){
+  const rs = S.restore && S.restore.id===w.id;
+  return `<div class="crumb"><a href="#/workspaces">${ic('arrow-left')} Workspaces</a></div>
+  <h1>${esc(w.name)}</h1><p class="lead" style="margin-bottom:16px">${w.items.length} items, last used ${esc(w.last)}.</p>
+  <div class="row section"><button class="btn primary" data-act="ws-restore" data-id="${w.id}" ${w.items.length?'':'disabled'}>${ic('arrow-counter-clockwise')}Restore</button><span class="caption subtle">Restore reopens files and folders. Editor tab layout and unsaved changes are not restored.</span></div>
+  ${rs?restorePanel(w):''}
+  ${!w.items.length?`<div class="empty"><p>This workspace has no items.</p></div>`:`<div class="list">${w.items.map((it,ix)=>{ const st=itemStatus(it), pr=projectOf(it.path);
+    return `<div class="li"><span class="subtle" style="width:20px">${ix+1}</span><div style="min-width:0"><strong>${esc(it.name)}</strong>${it.folder?' <span class="pill">folder</span>':''}<div class="mono subtle" style="overflow-wrap:anywhere">${esc(it.path)}</div></div><div class="sp"></div><span class="caption muted" style="min-width:130px">${pr?esc(pr.name):'No project'}</span><span class="caption subtle" style="min-width:100px">${EDITORS[it.ed]}</span>${statusPill(st)}</div>`; }).join('')}</div>`}`;
+}
+function restorePanel(w){
+  const res = w.items.map((it,ix)=>({it,ix,st:itemStatus(it)}));
+  const open = res.filter(x=>x.st==='available'), bad = res.filter(x=>x.st!=='available');
+  const pend = bad.filter(x=>!S.ack.has(x.it.path));
+  const head = !bad.length ? `All ${open.length} items opened` : `${open.length} opened, ${bad.length} missing`;
+  return `<div class="card lift section" aria-live="polite"><div class="row"><h2 style="margin:0">${ic(bad.length?'warning':'check-circle')} ${head}</h2><div class="sp"></div><button class="btn ghost sm" data-act="rs-close">Close</button></div>
+    <p class="small muted" style="margin:8px 0 16px">${open.length?`Opened ${open.length} item${open.length>1?'s':''} in their editors (simulated). `:''}Saved references were not changed.</p>
+    ${bad.map(x=>{ const ig=S.ack.has(x.it.path), rl=S.relink===x.it.path;
+      return `<div class="notice ${ig?'':'bad'}" style="margin-bottom:8px">${ic(ig?'eye-slash':'x-circle')}<div style="flex:1;min-width:0"><strong>${esc(x.it.name)}</strong> ${ig?'<span class="pill">Ignored</span>':''}<div class="mono subtle" style="overflow-wrap:anywhere">${esc(x.it.path)}</div><div class="small muted">${esc(reason(x.st,x.it.path))}</div>
+        ${rl?`<div class="row" style="margin-top:12px"><input class="in mono ${S.relinkErr?'err':''}" id="rl-in" placeholder="New path" autofocus><button class="btn primary sm" data-act="rl-apply">Apply</button><button class="btn ghost sm" data-act="rl-cancel">Cancel</button></div><div class="helper" style="margin-top:6px">Try ${esc(HINT_PATH)}</div>${S.relinkErr?`<div class="errtext" style="margin-top:6px">${ic('warning-circle')}${esc(S.relinkErr)}</div>`:''}`:''}</div>
+        ${!ig&&!rl?`<div class="row" style="gap:8px"><button class="btn secondary sm" data-act="rl-open" data-path="${esc(x.it.path)}">${ic('link')}Relink</button><button class="btn ghost sm" data-act="rs-ignore" data-path="${esc(x.it.path)}">Ignore</button></div>`:''}</div>`; }).join('')}
+    ${pend.length===0 && bad.length?`<p class="caption subtle">All missing items acknowledged. They stay saved in the workspace for repair later.</p>`:''}</div>`;
+}
+function doRelink(oldPath, np, setErr){
+  const v=np.trim(); if(!v) return setErr('Enter the new path for this file.');
+  if(!knownPaths().has(v.toLowerCase()) || S.missing.has(v)) return setErr(`${v} was not found. Check the path and try again.`);
+  S.ws.forEach(w=>w.items.forEach(i=>{ if(i.path===oldPath){ i.path=v; i.name=base(v); }}));
+  S.files.forEach(f=>{ if(f.path===oldPath){ f.path=v; f.name=base(v); }});
+  S.missing.delete(oldPath); S.ack.delete(oldPath); return null;
+}
+
+// ---------------------------------------------------------------- Config Catalog (F4)
+function vConfig(){
+  const all=files(); const c=S.cfg;
+  const rows = all.map(f=>({f, st:pathStatus(f.path), pr:projectOf(f.path)})).filter(x=>(!c.project||(x.pr&&x.pr.name===c.project))&&(!c.env||x.f.env===c.env)&&(!c.kind||x.f.kind===c.kind)&&(!c.status||x.st===c.status));
+  const sel=(k,label,opts)=>`<div class="field" style="margin:0"><label>${label}</label><select class="in" data-cf="${k}"><option value="">All</option>${opts.map(o=>`<option ${c[k]===o[0]?'selected':''} value="${esc(o[0])}">${esc(o[1])}</option>`).join('')}</select></div>`;
+  const chips=Object.entries(c).filter(([k,v])=>v).map(([k,v])=>`<span class="chip">${esc(k)}: ${esc(v)}<button aria-label="Remove filter ${esc(k)}" data-act="cf-remove" data-k="${k}">${ic('x')}</button></span>`).join('');
+  let body;
+  if(!all.length) body=`<div class="empty"><p>No config files registered. Registering a file stores its path only, never its contents.</p></div>`;
+  else if(!rows.length) body=`<div class="empty"><p>No config files match these filters.</p><button class="btn secondary" data-act="cf-clear">Clear filters</button></div>`;
+  else body=`<div class="list">${rows.map(({f,st,pr})=>{ const m=S.cfgMsg&&S.cfgMsg.id===f.id?S.cfgMsg:null, rl=S.cfgRelink===f.id;
+    return `<div class="li col"><div class="row"><div style="min-width:0"><strong>${esc(f.name)}</strong><div class="mono subtle" style="overflow-wrap:anywhere">${esc(f.path)}</div></div><div class="sp"></div><span class="caption muted" style="min-width:110px">${pr?esc(pr.name):'No project'}</span><span class="pill">${esc(f.env)}</span><span class="pill">${esc(f.kind)}</span>${statusPill(st)}
+      <div class="rel row" style="gap:0">${st==='available'?`<button class="btn secondary sm" data-act="cf-open" data-id="${f.id}" style="border-radius:8px 0 0 8px">Open</button><button class="btn secondary sm" aria-label="Choose editor" data-act="cf-menu" data-id="${f.id}" style="border-radius:0 8px 8px 0;margin-left:1px;padding:6px 8px">${ic('caret-down')}</button>${S.cfgMenu===f.id?`<div class="menu">${Object.entries(EDITORS).map(([k,l])=>`<button data-act="cf-open-with" data-id="${f.id}" data-ed="${k}">Open in ${l}</button>`).join('')}</div>`:''}`:`<button class="btn secondary sm" data-act="cf-relink" data-id="${f.id}">${ic('link')}Relink</button>`}</div></div>
+      ${st!=='available'?`<div class="small muted" style="margin-top:8px">${esc(reason(st,f.path))}</div>`:''}
+      ${m?`<div class="notice ${m.bad?'bad':'ok'}" style="margin-top:12px">${ic(m.bad?'warning-circle':'check-circle')}<span>${esc(m.text)}</span></div>`:''}
+      ${rl?`<div class="row" style="margin-top:12px"><input class="in mono ${S.cfgRelinkErr?'err':''}" id="cr-in" placeholder="New path" autofocus><button class="btn primary sm" data-act="cr-apply" data-id="${f.id}">Apply</button><button class="btn ghost sm" data-act="cr-cancel">Cancel</button></div><div class="helper" style="margin-top:6px">Try ${esc(HINT_PATH)}</div>${S.cfgRelinkErr?`<div class="errtext" style="margin-top:6px">${ic('warning-circle')}${esc(S.cfgRelinkErr)}</div>`:''}`:''}</div>`; }).join('')}</div>`;
+  return `<h1>Config Catalog</h1><p class="lead">Find the right environment's file. DevShelf stores paths and labels, never file contents.</p>
+    <div class="filters">${sel('project','Project',projects().map(p=>[p.name,p.name]))}${sel('env','Environment',['local','dev','staging','production'].map(x=>[x,x]))}${sel('kind','Kind',['YAML','Properties','.env','Docker Compose','Caddy/Nginx','JSON'].map(x=>[x,x]))}${sel('status','Status',[['available','Available'],['missing','Missing'],['inaccessible','Inaccessible']])}</div>
+    <div class="chips">${chips}${chips?`<a data-act="cf-clear">Clear filters</a>`:''}</div>${body}`;
+}
+
+// ---------------------------------------------------------------- Vault (F5)
+let tick = null;
+function startTick(){ clearInterval(tick); tick=setInterval(()=>{ if(!S.vault.unlocked || !S.saved.timeout) return; S.vault.secs--; if(S.vault.secs<=0){ lockVault('Vault locked after '+S.saved.timeout+' minute'+(S.saved.timeout>1?'s':'')+' of inactivity. Enter your master password to continue.'); } else updChip(); },1000); }
+function fmt(s){ return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+function chipText(){ return S.saved.timeout ? 'Auto-lock in '+fmt(S.vault.secs) : 'Auto-lock off'; }
+function updChip(){ const el=$('#chip'); if(el) el.textContent=chipText(); }
+function resetIdle(){ if(S.vault.unlocked && S.saved.timeout){ S.vault.secs=S.saved.timeout*60; updChip(); } }
+function lockVault(msg){ const v=S.vault; Object.values(v.revealed).forEach(clearTimeout); v.unlocked=false; v.revealed={}; v.msg=msg||'Vault locked.'; v.attempts=0; renderSideAndView(); }
+function vVault(){
+  const v=S.vault;
+  if(!v.unlocked) return `<h1>Vault</h1><p class="lead">Credentials stay locked until you enter the master password.</p>
+    <div class="card lockbox">${v.msg?`<div class="notice ${/inactiv/.test(v.msg)?'warn':'ok'}" style="margin-bottom:16px">${ic(/inactiv/.test(v.msg)?'timer':'lock-key')}<span>${esc(v.msg)}</span></div>`:''}
+      <div class="field"><label for="mp">Master password</label><input id="mp" type="password" class="in ${v.err?'err':''}" autofocus autocomplete="off">
+      ${v.err?`<div class="errtext">${ic('warning-circle')}${esc(v.err)}</div>`:''}${v.attempts>=3?`<div class="errtext">${ic('warning-circle')}${v.attempts} failed attempts</div>`:''}</div>
+      <button class="btn primary" data-act="vt-unlock">${ic('lock-key-open')}Unlock</button>
+      <p class="caption subtle" style="margin:16px 0 0">Demo hint: the prototype password is <span class="mono">shelf-demo-2026</span>. No real encryption is used here.</p></div>`;
+  const all=secrets(); const rows=all.filter(s=>(!v.fp||s.project===v.fp)&&(!v.ft||s.type===v.ft));
+  return `<div class="row"><div><h1>Vault</h1></div><div class="sp"></div><span class="pill" id="chip">${chipText()}</span><a class="caption" data-act="vt-skip">Skip to timeout</a><button class="btn secondary" data-act="vt-lock">${ic('lock-key')}Lock now</button></div>
+    <p class="lead">Values are masked. Reveal or copy only when you need them.</p>
+    ${!all.length?`<div class="empty"><p>No secrets yet.</p></div>`:`
+    <div class="row section"><div class="field" style="margin:0;width:220px"><select class="in" aria-label="Filter by project" data-vf="fp"><option value="">All projects</option>${[...new Set(all.map(s=>s.project).filter(Boolean))].map(p=>`<option ${v.fp===p?'selected':''}>${esc(p)}</option>`).join('')}</select></div>
+    <div class="field" style="margin:0;width:240px"><select class="in" aria-label="Filter by type" data-vf="ft"><option value="">All types</option>${[...new Set(all.map(s=>s.type))].map(p=>`<option ${v.ft===p?'selected':''}>${esc(p)}</option>`).join('')}</select></div></div>
+    ${rows.length?`<div class="list">${rows.map(s=>{ const rv=!!v.revealed[s.id];
+      return `<div class="li"><div style="min-width:0;flex:1.4"><strong>${esc(s.label)}</strong><div class="caption subtle">${esc(s.type)}${s.project?', '+esc(s.project):''}${s.env?', '+esc(s.env):''}</div></div><div class="secret" style="flex:1;overflow-wrap:anywhere">${rv?esc(s.value):MASK}</div><span class="caption subtle" style="min-width:84px">${s.upd}</span>
+      <button class="btn secondary sm" data-act="vt-reveal" data-id="${s.id}" aria-label="${rv?'Hide':'Reveal'} value">${ic(rv?'eye-slash':'eye')}${rv?'Hide':'Reveal'}</button><button class="btn secondary sm" data-act="vt-copy" data-id="${s.id}">${ic('copy')}Copy</button></div>`; }).join('')}</div>`:`<div class="empty"><p>No secrets match these filters.</p></div>`}`}`;
+}
+
+// ---------------------------------------------------------------- Notes (F6)
+function md(src){
+  const lines=esc(src).split('\n'); let out='', list=null, code=false;
+  const inl=t=>t.replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/\*([^*]+)\*/g,'<em>$1</em>');
+  const close=()=>{ if(list){ out+=`</${list}>`; list=null; } };
+  for(const l of lines){
+    if(l.startsWith('```')){ close(); out+= code?'</code></pre>':'<pre><code>'; code=!code; continue; }
+    if(code){ out+=l+'\n'; continue; }
+    let m;
+    if((m=l.match(/^(#{1,2}) (.*)/))){ close(); out+=`<h${m[1].length}>${inl(m[2])}</h${m[1].length}>`; }
+    else if((m=l.match(/^- \[( |x)\] (.*)/))){ if(list!=='ul'){close(); out+='<ul>'; list='ul';} out+=`<li class="task"><input type="checkbox" disabled ${m[1]==='x'?'checked':''}> <span class="${m[1]==='x'?'done':''}">${inl(m[2])}</span></li>`; }
+    else if((m=l.match(/^- (.*)/))){ if(list!=='ul'){close(); out+='<ul>'; list='ul';} out+=`<li>${inl(m[1])}</li>`; }
+    else if((m=l.match(/^\d+\. (.*)/))){ if(list!=='ol'){close(); out+='<ol>'; list='ol';} out+=`<li>${inl(m[1])}</li>`; }
+    else if(!l.trim()){ close(); } else { close(); out+=`<p>${inl(l)}</p>`; }
+  }
+  close(); return out;
+}
+function vNotes(r){
+  const list=notes();
+  if(r.id){ const n=S.notes.find(x=>x.id===r.id); if(n) return vNoteEditor(n); }
+  const f=S.noteFilter, rows=list.filter(n=>!f||(f==='__g'?!n.project:n.project===f)).sort((a,b)=>b.edited.localeCompare(a.edited));
+  return `<h1>Notes</h1><p class="lead">Private Markdown notes, stored outside your repositories.</p>
+  <div class="row section"><button class="btn primary" data-act="nt-new">${ic('plus')}New note</button><div class="sp"></div><div class="field" style="margin:0;width:220px"><select class="in" aria-label="Filter notes" data-nf="1"><option value="">All notes</option><option value="__g" ${f==='__g'?'selected':''}>General</option>${projects().map(p=>`<option ${f===p.name?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div></div>
+  ${!list.length?`<div class="empty"><p>No notes yet.</p><button class="btn primary" data-act="nt-new">${ic('plus')}New note</button></div>`:
+   `<div class="list">${rows.map(n=>`<div class="li click" data-go="#/notes/${n.id}">${ic('note-pencil')}<div style="min-width:0"><strong>${esc(n.title)}</strong><div class="small muted">${esc(n.project||'General')}</div></div><div class="sp"></div><span class="caption subtle">Edited ${esc(n.edited)}</span>${ic('caret-right')}</div>`).join('')||'<div class="empty"><p>No notes match this filter.</p></div>'}</div>`}`;
+}
+function saveHtml(){ const s=S.saveState; return s==='saved'?`<span class="save saved" id="sv">${ic('check-circle')}Saved ${esc(S.saveTime)}</span>`: s==='unsaved'?`<span class="save unsaved" id="sv">${ic('pencil-simple')}Unsaved changes</span>`:`<span class="save fail" id="sv">${ic('warning-circle')}Couldn't save <a data-act="nt-retry">Retry</a></span>`; }
+function vNoteEditor(n){
+  return `<div class="crumb"><a href="#/notes">${ic('arrow-left')} Notes</a></div>
+  <div class="row section"><input class="in" id="nt-title" style="font:600 22px var(--font);max-width:560px" value="${esc(n.title)}" aria-label="Note title"><div class="sp"></div><label class="row caption muted" style="gap:8px;cursor:pointer"><input type="checkbox" id="nt-prevtog" ${S.preview?'checked':''}>Show preview</label><span id="svbox">${saveHtml()}</span></div>
+  <div class="row wrapx" style="margin:-16px 0 24px"><div class="field" style="margin:0;width:220px"><select class="in" id="nt-proj" aria-label="Project"><option value="">General</option>${projects().map(p=>`<option ${n.project===p.name?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div><span class="pill">${ic('hard-drives')}Stored locally outside project roots</span><div class="sp"></div><label class="row caption muted" style="gap:8px;cursor:pointer"><input type="checkbox" id="nt-fail" ${S.saveFail?'checked':''}>Simulate save failure</label></div>
+  <div class="split" ${S.preview?'':'style="grid-template-columns:1fr"'}><textarea class="in ta" id="nt-body" aria-label="Markdown" placeholder="Start with a heading, a checklist, or a command you keep forgetting.">${esc(n.body)}</textarea>${S.preview?`<div class="md" id="nt-prev" aria-label="Preview">${n.body.trim()?md(n.body):'<p class="subtle">The rendered preview appears here.</p>'}</div>`:''}</div>`;
+}
+function noteBind(){
+  const id=route().id, n=S.notes.find(x=>x.id===id); if(!n) return;
+  const body=$('#nt-body'), title=$('#nt-title'), proj=$('#nt-proj');
+  const dirty=()=>{ S.saveState='unsaved'; $('#svbox').innerHTML=saveHtml(); clearTimeout(S.saveTimer); S.saveTimer=setTimeout(()=>commit(n),1000); };
+  body.addEventListener('input',()=>{ n.body=body.value; const pv=$('#nt-prev'); if(pv) pv.innerHTML=n.body.trim()?md(n.body):'<p class="subtle">The rendered preview appears here.</p>'; dirty(); });
+  title.addEventListener('input',()=>{ n.title=title.value; dirty(); });
+  proj.addEventListener('change',()=>{ n.project=proj.value; dirty(); });
+  $('#nt-fail').addEventListener('change',e=>{ S.saveFail=e.target.checked; });
+  $('#nt-prevtog').addEventListener('change',e=>{ S.preview=e.target.checked; render(); const b=$('#nt-body'); b.focus(); b.setSelectionRange(b.value.length,b.value.length); });
+}
+let saveCount = 0;
+function commit(n){ if(S.saveFail){ S.saveState='fail'; } else { saveCount++; const mm=String(4+saveCount).padStart(2,'0'); S.saveState='saved'; S.saveTime='at 09:'+mm; n.edited=TODAY+' 09:'+mm; }
+  const b=$('#svbox'); if(b) b.innerHTML=saveHtml(); }
+
+// ---------------------------------------------------------------- Settings (F7)
+function vSettings(){
+  const d=S.draft;
+  return `<h1>Settings</h1><p class="lead">Choose how files open and when the Vault locks.</p>
+  <section class="section"><h2>Editor profiles</h2><div class="list">${Object.entries(EDITORS).map(([k,l])=>`<div class="radio-row"><input type="radio" name="def" id="r-${k}" value="${k}" ${d.def===k?'checked':''} data-st="def"><label for="r-${k}" style="min-width:130px"><strong>${l}</strong>${d.def===k?' <span class="pill ok">Default</span>':''}</label>${k==='win'?`<span class="small muted">Uses the Windows file association. No executable path needed.</span>`:`<input class="in mono ${S.settingsErr&&d.def===k&&!d.paths[k].trim()?'err':''}" aria-label="${l} executable path" data-sp="${k}" value="${esc(d.paths[k])}" placeholder="Path to the editor executable">`}</div>`).join('')}</div>
+  ${S.settingsErr?`<div class="errtext" style="margin-top:8px">${ic('warning-circle')}${esc(S.settingsErr)}</div>`:''}</section>
+  <section class="section"><h2>Vault auto-lock</h2><div class="field" style="max-width:320px"><label for="to">Lock after inactivity</label><select id="to" class="in" data-st="timeout">${[[1,'1 minute'],[5,'5 minutes'],[15,'15 minutes'],[0,'Never while the app is open']].map(([v,l])=>`<option value="${v}" ${d.timeout===v?'selected':''}>${l}</option>`).join('')}</select></div></section>
+  <div class="row"><button class="btn primary" data-act="st-save">Save settings</button><button class="btn ghost" data-act="st-reset">Reset changes</button>${S.settingsOk?`<span class="save saved">${ic('check-circle')}Settings saved</span>`:''}</div>`;
+}
+
+// ---------------------------------------------------------------- Quick open palette (F8)
+function palItems(q){
+  const recent=[...wsList().slice().sort((a,b)=>b.last.localeCompare(a.last)).slice(0,3).map(w=>({g:'Workspaces',t:w.name,s:w.items.length+' items',ic:'stack',go:'#/workspaces/'+w.id})), ...notes().slice().sort((a,b)=>b.edited.localeCompare(a.edited)).slice(0,3).map(n=>({g:'Notes',t:n.title,s:n.project||'General',ic:'note-pencil',go:'#/notes/'+n.id}))];
+  if(!q) return recent;
+  const all=[...projects().map(p=>({g:'Projects',t:p.name,s:p.root,ic:'folders',go:'#/projects/'+p.id})), ...wsList().map(w=>({g:'Workspaces',t:w.name,s:w.items.length+' items',ic:'stack',go:'#/workspaces/'+w.id})), ...files().map(f=>({g:'Config files',t:f.name,s:f.path,ic:'file-text',go:'#/config'})), ...notes().map(n=>({g:'Notes',t:n.title,s:n.project||'General',ic:'note-pencil',go:'#/notes/'+n.id}))];
+  return all.filter(x=>(x.t+' '+x.s).toLowerCase().includes(q.toLowerCase()));
+}
+function palDraw(){
+  const P=S.pal; if(!P){ $('#palette').innerHTML=''; return; }
+  const items=palItems(P.q); P.items=items; if(P.sel>=items.length) P.sel=Math.max(0,items.length-1);
+  let last='', html='';
+  items.forEach((it,i)=>{ if(it.g!==last){ html+=`<div class="pal-grp">${it.g}</div>`; last=it.g; } html+=`<div class="pal-it ${i===P.sel?'on':''}" data-pi="${i}">${ic(it.ic)}<div style="min-width:0"><div>${esc(it.t)}</div><div class="caption subtle" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.s)}</div></div></div>`; });
+  $('#palette').innerHTML=`<div class="scrim" data-act="pal-scrim"><div class="pal" role="dialog" aria-modal="true" aria-label="Quick open"><input id="pq" placeholder="Search projects, workspaces, config files, notes" value="${esc(P.q)}" autocomplete="off"><div class="pal-list">${items.length?(P.q?'':'<div class="pal-grp">Recent</div>')+html:'<div class="pal-grp" style="text-transform:none;letter-spacing:0;font-size:14px;padding:16px">No results for this search</div>'}</div></div></div>`;
+  const i=$('#pq'); i.focus(); i.setSelectionRange(i.value.length,i.value.length);
+}
+function palGo(i){ const it=S.pal.items[i]; if(!it) return; S.pal=null; palDraw(); if(it.go.startsWith('#/projects/')) S.expanded=it.go.split('/')[2]; if(location.hash===it.go) renderSideAndView(); else location.hash=it.go; }
+
+// ---------------------------------------------------------------- events
+document.addEventListener('click', e=>{
+  resetIdle();
+  const go=e.target.closest('[data-go]'); if(go && !e.target.closest('button')){ location.hash=go.dataset.go; return; }
+  const pi=e.target.closest('[data-pi]'); if(pi){ palGo(+pi.dataset.pi); return; }
+  const t=e.target.closest('[data-act]'); if(!t) { if(S.cfgMenu){ S.cfgMenu=null; render(); } return; }
+  const a=t.dataset.act, id=t.dataset.id;
+  if(a==='pal-scrim'){ if(e.target===t){ S.pal=null; palDraw(); } return; }
+  if(a==='dlg-scrim'){ if(e.target===t){ S.dialog=null; dlgDraw(); } return; }
+  switch(a){
+    case 'pal-open': S.pal={q:'',sel:0}; palDraw(); break;
+    case 'demo-toggle': S.demoOpen=!S.demoOpen; renderSide(); break;
+    case 'ds-full': S.empty=false; renderSideAndView(); break;
+    case 'ds-empty': S.empty=true; renderSideAndView(); break;
+    case 'drive-toggle': S.driveF=t.checked; renderSideAndView(); break;
+    case 'dlg-open': S.dialog={path:'',name:'',type:'Node worker',tags:'',errors:{}}; dlgDraw(); break;
+    case 'dlg-close': S.dialog=null; dlgDraw(); break;
+    case 'dlg-browse': S.dialog.path=NEW_PROJECT_PATH; if(!S.dialog.name.trim()) S.dialog.name='notify-worker'; S.dialog.errors={}; dlgDraw(); break;
+    case 'dlg-save': dlgSave(); break;
+    case 'proj-toggle': S.expanded = S.expanded===id?null:id; S.hl=null; render(); break;
+    case 'ws-restore': { const w=S.ws.find(x=>x.id===id); S.restore={id}; S.relink=null; S.relinkErr='';
+      w.last=TODAY+' '+NOW; w.lastMissing=w.items.filter(i=>itemStatus(i)!=='available').length; render(); break; }
+    case 'rs-close': S.restore=null; S.relink=null; render(); break;
+    case 'rs-ignore': S.ack.add(t.dataset.path); render(); break;
+    case 'rl-open': S.relink=t.dataset.path; S.relinkErr=''; render(); break;
+    case 'rl-cancel': S.relink=null; S.relinkErr=''; render(); break;
+    case 'rl-apply': { const err=doRelink(S.relink,$('#rl-in').value,m=>{ S.relinkErr=m; return m; }); if(!err){ S.relink=null; S.relinkErr=''; const w=S.ws.find(x=>x.id===S.restore.id); w.lastMissing=w.items.filter(i=>itemStatus(i)!=='available').length; toast('Path relinked. The workspace now points to the new file.'); } render(); break; }
+    case 'cf-remove': S.cfg[t.dataset.k]=''; render(); break;
+    case 'cf-clear': S.cfg={project:'',env:'',kind:'',status:''}; render(); break;
+    case 'cf-menu': S.cfgMenu = S.cfgMenu===id?null:id; render(); e.stopPropagation(); break;
+    case 'cf-open': case 'cf-open-with': { const f=S.files.find(x=>x.id===id); const ed = a==='cf-open'?defaultEd():EDITORS[t.dataset.ed]; S.cfgMenu=null;
+      S.cfgMsg={id, text:`Opened ${f.name} in ${ed}.`}; render(); break; }
+    case 'cf-relink': S.cfgRelink=id; S.cfgRelinkErr=''; render(); break;
+    case 'cr-cancel': S.cfgRelink=null; render(); break;
+    case 'cr-apply': { const f=S.files.find(x=>x.id===id); const err=doRelink(f.path,$('#cr-in').value,m=>{ S.cfgRelinkErr=m; return m; }); if(!err){ S.cfgRelink=null; S.cfgRelinkErr=''; toast('Path relinked. The catalog now points to the new file.'); } render(); break; }
+    case 'vt-unlock': vtUnlock(); break;
+    case 'vt-lock': lockVault('Vault locked.'); break;
+    case 'vt-skip': lockVault('Vault locked after '+(S.saved.timeout||5)+' minutes of inactivity. Enter your master password to continue.'); break;
+    case 'vt-reveal': { const v=S.vault; if(v.revealed[id]){ clearTimeout(v.revealed[id]); delete v.revealed[id]; } else { v.revealed[id]=setTimeout(()=>{ delete v.revealed[id]; if(route().page==='vault') render(); },10000); } render(); break; }
+    case 'vt-copy': toast('Copied to clipboard'); break;
+    case 'nt-new': { const n={id:'n'+(S.notes.length+1),title:'Untitled note',project:'',edited:TODAY+' '+NOW,body:''}; S.notes.unshift(n); S.saveState='saved'; S.saveTime='just now'; location.hash='#/notes/'+n.id; break; }
+    case 'nt-retry': { const n=S.notes.find(x=>x.id===route().id); commit(n); break; }
+    case 'st-save': { const d=S.draft; if(d.def!=='win' && !d.paths[d.def].trim()){ S.settingsErr='Enter the path to the editor executable.'; S.settingsOk=false; render(); break; }
+      S.settingsErr=''; S.saved=JSON.parse(JSON.stringify(d)); S.settingsOk=true; if(S.vault.unlocked) resetIdle(); render(); toast('Settings saved'); break; }
+    case 'st-reset': S.draft=JSON.parse(JSON.stringify(S.saved)); S.settingsErr=''; S.settingsOk=false; render(); break;
+  }
+});
+document.addEventListener('input', e=>{
+  resetIdle(); const t=e.target;
+  if(t.dataset.d){ S.dialog[t.dataset.d]=t.value; }
+  if(t.id==='pq'){ S.pal.q=t.value; S.pal.sel=0; palDraw(); }
+  if(t.dataset.sp){ S.draft.paths[t.dataset.sp]=t.value; S.settingsOk=false; }
+});
+document.addEventListener('change', e=>{
+  const t=e.target;
+  if(t.dataset.cf){ S.cfg[t.dataset.cf]=t.value; render(); }
+  if(t.dataset.vf){ S.vault[t.dataset.vf]=t.value; render(); }
+  if(t.dataset.nf){ S.noteFilter=t.value; render(); }
+  if(t.dataset.st==='def'){ S.draft.def=t.value; S.settingsErr=''; S.settingsOk=false; render(); }
+  if(t.dataset.st==='timeout'){ S.draft.timeout=+t.value; S.settingsOk=false; }
+  /* demo toggles are handled in the click handler */
+});
+document.addEventListener('keydown', e=>{
+  resetIdle();
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); S.pal={q:'',sel:0}; palDraw(); return; }
+  if(S.pal){
+    if(e.key==='Escape'){ S.pal=null; palDraw(); }
+    else if(e.key==='ArrowDown'){ e.preventDefault(); S.pal.sel=Math.min(S.pal.items.length-1,S.pal.sel+1); palDraw(); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); S.pal.sel=Math.max(0,S.pal.sel-1); palDraw(); }
+    else if(e.key==='Enter'){ e.preventDefault(); palGo(S.pal.sel); }
+    return;
+  }
+  if(e.key==='Escape'){ if(S.dialog){ S.dialog=null; dlgDraw(); } else if(S.cfgMenu){ S.cfgMenu=null; render(); } return; }
+  if(e.key==='Enter' && e.target.id==='mp') vtUnlock();
+  if(e.key==='Enter' && e.target.id==='rl-in') $('[data-act=rl-apply]').click();
+  if(e.key==='Enter' && e.target.id==='cr-in') $('[data-act=cr-apply]').click();
+});
+function vtUnlock(){
+  const v=S.vault, pw=$('#mp').value;
+  if(!pw){ v.err='Enter your master password.'; render(); return; }
+  if(pw!=='shelf-demo-2026'){ v.attempts++; v.err='Master password is incorrect. Try again.'; render(); return; }
+  v.unlocked=true; v.err=''; v.msg=''; v.attempts=0; v.secs=(S.saved.timeout||0)*60; renderSideAndView();
+}
+
+startTick();
+renderSideAndView();
+</script>
+</body>
+</html>

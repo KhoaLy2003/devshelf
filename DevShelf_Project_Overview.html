@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="DevShelf project kickoff overview: a local-first desktop workspace, config catalog, encrypted secrets vault, and private project notes app." />
+  <title>DevShelf — Project Overview</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6fa;
+      --surface: #ffffff;
+      --surface-alt: #f8fafc;
+      --ink: #172033;
+      --muted: #5c667a;
+      --line: #e1e6ef;
+      --brand: #4658cc;
+      --brand-dark: #2c3ca0;
+      --brand-soft: #edf0ff;
+      --green: #13795b;
+      --green-soft: #e8f7f0;
+      --amber: #8a5b08;
+      --amber-soft: #fff5dc;
+      --shadow: 0 16px 44px rgba(31, 42, 70, .08);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 16px/1.6 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: var(--brand-dark); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .page { max-width: 1180px; margin: 0 auto; padding: 28px 26px 64px; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 22px; }
+    .brand { display: flex; gap: 12px; align-items: center; font-weight: 800; letter-spacing: -.03em; }
+    .brand-mark { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; color: white; background: linear-gradient(140deg, #6575ee, #3547b6); box-shadow: 0 8px 20px rgba(70,88,204,.25); }
+    .brand-mark svg { width: 23px; height: 23px; }
+    .document-tag { color: var(--muted); font-size: .82rem; }
+    .hero { position: relative; overflow: hidden; border-radius: 28px; padding: 48px; color: white; background: radial-gradient(circle at 85% 10%, rgba(130,146,255,.5), transparent 30%), linear-gradient(120deg, #192448 0%, #293780 54%, #4658cc 100%); box-shadow: var(--shadow); }
+    .hero::after { content: ""; position: absolute; width: 320px; height: 320px; right: -70px; bottom: -210px; border: 1px solid rgba(255,255,255,.22); border-radius: 50%; box-shadow: 0 0 0 38px rgba(255,255,255,.04), 0 0 0 78px rgba(255,255,255,.035); }
+    .eyebrow { text-transform: uppercase; letter-spacing: .14em; font-size: .76rem; font-weight: 750; opacity: .8; }
+    h1 { margin: 12px 0 14px; max-width: 760px; font-size: clamp(2.5rem, 5.6vw, 4.6rem); line-height: 1.04; letter-spacing: -.055em; }
+    .hero p { max-width: 750px; color: #e3e7ff; font-size: 1.12rem; margin: 0; }
+    .hero-meta { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+    .pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 6px 11px; border: 1px solid rgba(255,255,255,.23); background: rgba(255,255,255,.1); font-size: .82rem; }
+    .section { margin-top: 38px; }
+    .section-head { display: flex; justify-content: space-between; gap: 18px; align-items: end; margin-bottom: 16px; }
+    h2 { margin: 0; font-size: clamp(1.45rem, 2.6vw, 2rem); line-height: 1.2; letter-spacing: -.035em; }
+    h3 { margin: 0 0 7px; font-size: 1.08rem; letter-spacing: -.018em; }
+    .section-head p, .muted { color: var(--muted); margin: 6px 0 0; }
+    .grid { display: grid; gap: 15px; }
+    .grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; box-shadow: 0 4px 14px rgba(31,42,70,.025); }
+    .icon-box { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 13px; color: var(--brand-dark); background: var(--brand-soft); margin-bottom: 15px; }
+    .icon-box svg { width: 23px; height: 23px; }
+    .card p { margin: 0; color: var(--muted); font-size: .94rem; }
+    .callout { display: flex; gap: 14px; padding: 18px 20px; border: 1px solid #d4dafa; border-radius: 16px; background: var(--brand-soft); }
+    .callout strong { display: block; margin-bottom: 3px; }
+    .callout p { margin: 0; color: #38416f; }
+    .flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: stretch; gap: 10px; }
+    .flow-node { border: 1px solid var(--line); background: var(--surface); border-radius: 15px; padding: 17px; text-align: center; }
+    .flow-node b { display: block; margin-bottom: 5px; }
+    .flow-node span { color: var(--muted); font-size: .85rem; }
+    .flow-arrow { align-self: center; color: #8b96ae; font-size: 1.35rem; }
+    .stack { display: grid; grid-template-columns: 135px 1fr; border: 1px solid var(--line); border-radius: 15px; overflow: hidden; background: var(--surface); }
+    .stack-label { display: flex; align-items: center; padding: 15px; background: var(--surface-alt); border-bottom: 1px solid var(--line); font-weight: 750; }
+    .stack-content { padding: 15px 18px; border-bottom: 1px solid var(--line); color: var(--muted); }
+    .stack > :nth-last-child(-n+2) { border-bottom: 0; }
+    .tag-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+    .tag { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 8px; background: var(--surface-alt); border: 1px solid var(--line); color: #3f4a5d; font-size: .82rem; }
+    .phase { display: flex; gap: 13px; align-items: start; }
+    .phase-num { flex: 0 0 35px; height: 35px; border-radius: 11px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand-dark); font-weight: 800; }
+    .phase p { margin: 0; color: var(--muted); font-size: .93rem; }
+    .priority { display: inline-block; border-radius: 999px; padding: 3px 8px; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+    .priority.p0 { color: var(--green); background: var(--green-soft); }
+    .priority.p1 { color: var(--amber); background: var(--amber-soft); }
+    .security-list { list-style: none; margin: 10px 0 0; padding: 0; }
+    .security-list li { position: relative; padding-left: 25px; margin: 9px 0; color: var(--muted); }
+    .security-list li::before { content: "✓"; position: absolute; left: 0; top: 0; color: var(--green); font-weight: 900; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid var(--line); margin-top: 42px; padding-top: 22px; color: var(--muted); font-size: .85rem; }
+    .small { font-size: .88rem; }
+    @media (max-width: 900px) { .grid.four { grid-template-columns: repeat(2, minmax(0,1fr)); } .grid.three { grid-template-columns: 1fr; } .hero { padding: 34px; } }
+    @media (max-width: 640px) { .page { padding: 16px 13px 38px; } .topbar { align-items: start; } .document-tag { text-align: right; } .hero { padding: 28px 23px; border-radius: 22px; } .grid.four, .grid.two, .two-col { grid-template-columns: 1fr; } .flow { grid-template-columns: 1fr; } .flow-arrow { transform: rotate(90deg); justify-self: center; } .stack { grid-template-columns: 1fr; } .stack-label { border-bottom: 0; padding-bottom: 5px; } .stack-content { padding-top: 6px; } .stack > :nth-last-child(2) { border-bottom: 1px solid var(--line); } }
+    @media print { body { background: white; } .page { max-width: none; padding: 0; } .hero, .card { box-shadow: none; break-inside: avoid; } .section { break-inside: avoid; } a { color: inherit; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H20v14H6.5A2.5 2.5 0 0 1 4 16.5z"/><path d="M4 8h16M8 12h8M8 15h5"/></svg>
+        </div>
+        <span>DevShelf</span>
+      </div>
+      <div class="document-tag">PRODUCT KICKOFF · v0.1 · 10 OCT 2026</div>
+    </header>
+
+    <section class="hero" aria-labelledby="page-title">
+      <div class="eyebrow">Local-first developer productivity</div>
+      <h1 id="page-title">A home for projects, configs, secrets, and notes.</h1>
+      <p>DevShelf is a Windows desktop app that helps developers organize project files and restore working sets, catalog environment configuration, securely store credentials, and keep private technical notes—while continuing to use their preferred external editors.</p>
+      <div class="hero-meta">
+        <span class="pill">Windows desktop</span>
+        <span class="pill">Offline by default</span>
+        <span class="pill">Encrypted local vault</span>
+        <span class="pill">External-editor workflow</span>
+        <span class="pill">Sync-ready architecture</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="callout">
+        <div class="icon-box" style="margin:0; flex:0 0 44px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v5.5c0 4.3 3 7.7 7.5 9.5 4.5-1.8 7.5-5.2 7.5-9.5V6z"/><path d="m9 12 2 2 4-4"/></svg></div>
+        <div><strong>Product principle</strong><p>DevShelf is a management layer over the filesystem and existing tools—not a new IDE and not a replacement for the files already used by projects.</p></div>
+      </div>
+    </section>
+
+    <section class="section" id="capabilities">
+      <div class="section-head"><div><h2>Four core capabilities</h2><p>One coherent workflow, with clear boundaries between references and protected data.</p></div></div>
+      <div class="grid four">
+        <article class="card">
+          <div class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H10l2 2h7.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/><path d="M3.5 10h17"/></svg></div>
+          <h3>Project & Workspace</h3><p>Register repositories and build reusable collections of files and folders across locations.</p>
+          <div class="tag-list"><span class="tag">Project registry</span><span class="tag">Restore</span><span class="tag">Quick open</span></div>
+        </article>
+        <article class="card">
+          <div class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v6h5M8 13h8M8 17h8"/></svg></div>
+          <h3>Config Catalog</h3><p>Track existing configuration files by project, environment, type, and status without copying or rewriting them.</p>
+          <div class="tag-list"><span class="tag">.env references</span><span class="tag">YAML</span><span class="tag">Docker</span></div>
+        </article>
+        <article class="card">
+          <div class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></div>
+          <h3>Encrypted Secrets Vault</h3><p>Store API keys, tokens, credentials, and connection strings; reveal or copy only through intentional actions.</p>
+          <div class="tag-list"><span class="tag">Master password</span><span class="tag">AEAD encryption</span><span class="tag">Auto-lock</span></div>
+        </article>
+        <article class="card">
+          <div class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18H5z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div>
+          <h3>Private Project Notes</h3><p>Keep setup guides, deployment notes, debugging records, and checklists outside repository roots.</p>
+          <div class="tag-list"><span class="tag">Markdown</span><span class="tag">Autosave</span><span class="tag">Project-linked</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="workflow">
+      <div class="section-head"><div><h2>How the pieces fit together</h2><p>Separate the filesystem references from encrypted app-managed data.</p></div></div>
+      <div class="flow" aria-label="Architecture flow">
+        <div class="flow-node"><b>React + TypeScript</b><span>Projects, workspaces, config catalog, notes, Vault UI</span></div>
+        <div class="flow-arrow" aria-hidden="true">→</div>
+        <div class="flow-node"><b>Tauri + Rust</b><span>Validated commands, filesystem, editor launching, cryptography</span></div>
+        <div class="flow-arrow" aria-hidden="true">→</div>
+        <div class="flow-node"><b>Local storage</b><span>SQLite metadata + encrypted secret/note content</span></div>
+      </div>
+      <div style="margin-top:15px" class="callout">
+        <div class="icon-box" style="margin:0; flex:0 0 44px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/><path d="m15 16 2 2 4-4"/></svg></div>
+        <div><strong>External-editor workflow</strong><p>DevShelf stores file references and launch preferences. It opens a file in Notepad++, VS Code, or the selected application; it does not attempt to replace the editor or promise restoration of unsaved buffers and internal tab state.</p></div>
+      </div>
+    </section>
+
+    <section class="section" id="technology">
+      <div class="section-head"><div><h2>Proposed technology</h2><p>A compact desktop architecture designed for offline operation and maintainability.</p></div></div>
+      <div class="stack">
+        <div class="stack-label">Desktop</div><div class="stack-content"><strong>Tauri 2</strong> — Windows packaging, native capabilities, controlled IPC.</div>
+        <div class="stack-label">Frontend</div><div class="stack-content"><strong>React + TypeScript + Vite</strong> — feature-based UI; Tailwind CSS and a reusable component system.</div>
+        <div class="stack-label">Native services</div><div class="stack-content"><strong>Rust</strong> — validation, application use cases, filesystem access, editor launching, and all Vault cryptographic operations.</div>
+        <div class="stack-label">Local database</div><div class="stack-content"><strong>SQLite</strong> — project/workspace metadata and encrypted records; no database server required.</div>
+        <div class="stack-label">Security</div><div class="stack-content"><strong>Argon2id + authenticated encryption</strong> — proposed design subject to security review and use of maintained cryptographic libraries.</div>
+      </div>
+    </section>
+
+    <section class="section" id="security">
+      <div class="section-head"><div><h2>Security is a product requirement</h2><p>Protect data at rest and reduce accidental disclosure during use.</p></div></div>
+      <div class="grid two">
+        <article class="card">
+          <h3>Vault design principles</h3>
+          <ul class="security-list">
+            <li>Derive a key from the master password with Argon2id.</li>
+            <li>Use a random Vault Data Key, wrapped by a key derived from the password.</li>
+            <li>Encrypt secrets and private note content before database persistence.</li>
+            <li>Keep crypto operations in Rust; do not persist keys or plaintext in frontend storage.</li>
+            <li>Mask by default; reveal/copy is explicit and requires an unlocked Vault.</li>
+            <li>Lock on demand, inactivity, and app exit; clear app-level decrypted caches.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Security boundaries</h3>
+          <ul class="security-list">
+            <li>No secrets or note bodies in logs, telemetry, error messages, or audit events.</li>
+            <li>Plaintext `.env` export is explicit, warned, and never silently overwrites.</li>
+            <li>Clipboard clearing is best-effort; clipboard history and paste targets cannot be controlled.</li>
+            <li>Least-privilege Tauri permissions; no generic arbitrary-command execution.</li>
+            <li>Encrypted backup/restore must be tested before internal rollout.</li>
+            <li>Host malware or a compromised user account is outside the Vault's complete protection.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="mvp">
+      <div class="section-head"><div><h2>MVP delivery roadmap</h2><p>Deliver a useful vertical slice first; add sensitive functionality after the storage and security foundation is ready.</p></div></div>
+      <div class="grid two">
+        <article class="card phase"><div class="phase-num">0</div><div><h3>Foundation <span class="priority p0">Required</span></h3><p>Tauri/React/Rust skeleton, SQLite migrations, app-data paths, logging policy, capability baseline, Windows build.</p></div></article>
+        <article class="card phase"><div class="phase-num">1</div><div><h3>Project & Workspace <span class="priority p0">Required</span></h3><p>Project registry, tags, file references, editor profiles, collections, restoration, and missing-path handling.</p></div></article>
+        <article class="card phase"><div class="phase-num">2</div><div><h3>Config Catalog & Notes <span class="priority p0">Required</span></h3><p>Environment labels, bounded discovery, private Markdown notes, autosave, search, and at-rest protection.</p></div></article>
+        <article class="card phase"><div class="phase-num">3</div><div><h3>Encrypted Vault <span class="priority p0">Required</span></h3><p>Reviewed crypto implementation, unlock/lock, encrypted records, mask/reveal/copy, auto-lock, security tests.</p></div></article>
+        <article class="card phase"><div class="phase-num">4</div><div><h3>Hardening & Backup <span class="priority p1">Next</span></h3><p>Verified encrypted backup/restore, import/export, selected config diff/validation, Windows release review.</p></div></article>
+        <article class="card phase"><div class="phase-num">+</div><div><h3>Optional Sync <span class="priority p1">Later</span></h3><p>Separate requirements and threat model for device identity, conflict handling, key recovery, and encrypted transport/storage.</p></div></article>
+      </div>
+    </section>
+
+    <section class="section" id="scope">
+      <div class="section-head"><div><h2>What is in—and out—of the MVP</h2></div></div>
+      <div class="two-col">
+        <article class="card">
+          <h3>Included</h3>
+          <ul class="security-list">
+            <li>Project registry and cross-project workspaces</li>
+            <li>Config-file references and environment labels</li>
+            <li>External editor profiles and quick open</li>
+            <li>Project-linked private notes stored outside project roots</li>
+            <li>Encrypted local Vault with explicit reveal/copy flows</li>
+            <li>Local-only operation and tested backup/restore</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Deferred</h3>
+          <ul class="security-list">
+            <li>Embedded code editor or terminal</li>
+            <li>Automatic secret injection into processes</li>
+            <li>Automatic configuration rewriting/deployment</li>
+            <li>Team sharing and centralized remote secret service</li>
+            <li>Cloud sync and multi-device conflict resolution</li>
+            <li>Repository-wide content indexing by default</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="success">
+      <div class="section-head"><div><h2>Definition of success</h2><p>The app is ready for internal rollout when these outcomes are demonstrated, not merely implemented.</p></div></div>
+      <div class="card">
+        <div class="grid three">
+          <div><h3>Fast to resume</h3><p>A developer can register several projects, save a cross-project file collection, restart DevShelf, and reopen the collection without manually navigating each folder.</p></div>
+          <div><h3>Safe by default</h3><p>Project files are never silently changed; Vault records and private notes are encrypted at rest; plaintext access is explicit and no protected content is logged.</p></div>
+          <div><h3>Recoverable</h3><p>Missing paths are repairable, migrations are tested, and an encrypted backup can be restored and unlocked in a clean environment.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="callout">
+        <div class="icon-box" style="margin:0; flex:0 0 44px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></div>
+        <div><strong>Kickoff decisions required</strong><p>Confirm product name and supported Windows versions; approve the Vault cryptographic design and recovery policy; decide which metadata is encrypted; define auto-lock and clipboard behavior; set performance targets; and confirm internal handling rules for production credentials.</p></div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span><strong>DevShelf</strong> · Product & Engineering Kickoff Overview</span>
+      <span>Working title · Proposed baseline for review · See the companion Markdown document for detailed requirements.</span>
+    </footer>
+  </main>
+</body>
+</html>
