@@ -1,21 +1,36 @@
-import { useEffect, useState } from "react";
-import { appInfo } from "./lib/commands";
-import type { AppInfo } from "./types/commands";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { RouterProvider } from "react-router";
+import { resolveGate } from "./lib/gate";
+import { storageStatus } from "./lib/commands";
+import { router } from "./router";
+import { StorageErrorScreen } from "./screens/storage-error-screen";
+
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false, staleTime: Infinity } },
+});
+
+function Gate() {
+  const status = useQuery({ queryKey: ["storage-status"], queryFn: storageStatus });
+  const gate = resolveGate(status);
+
+  switch (gate.kind) {
+    case "loading":
+      return (
+        <div className="flex h-full items-center justify-center bg-canvas text-ink-muted">
+          Starting DevShelf…
+        </div>
+      );
+    case "error":
+      return <StorageErrorScreen code={gate.code} folder={gate.folder} />;
+    case "ready":
+      return <RouterProvider router={router} />;
+  }
+}
 
 export function App() {
-  const [info, setInfo] = useState<AppInfo | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    appInfo().then(setInfo, () => setFailed(true));
-  }, []);
-
   return (
-    <main>
-      <h1>Hello, DevShelf</h1>
-      <p data-testid="app-info">
-        {failed ? "app_info failed" : info ? `${info.name} v${info.version}` : "loading..."}
-      </p>
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <Gate />
+    </QueryClientProvider>
   );
 }

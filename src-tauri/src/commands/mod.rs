@@ -1,4 +1,9 @@
-use serde::Serialize;
+pub mod storage;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize)]
+pub struct AppInfoArgs {}
 
 #[derive(Debug, Serialize)]
 pub struct AppInfo {
@@ -14,7 +19,7 @@ fn build_app_info() -> AppInfo {
 }
 
 #[tauri::command]
-pub fn app_info() -> AppInfo {
+pub fn app_info(_args: AppInfoArgs) -> AppInfo {
     build_app_info()
 }
 

@@ -1,12 +1,27 @@
-html,
-body {
-  margin: 0;
-  background: #111111;
-  color: #eaeaea;
-  font-family: system-ui, sans-serif;
-  color-scheme: dark;
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #000000;
+  --color-surface: #15181e;
+  --color-surface-raised: #1f232b;
+  --color-hairline: #3b3d45;
+  --color-ink: #ffffff;
+  --color-ink-muted: #b2b6bd;
+  --color-accent: #2b89ff;
+  --color-warning: #ffcf25;
+  --font-sans: Inter, "Segoe UI", system-ui, sans-serif;
 }
 
-main {
-  padding: 2rem;
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  color-scheme: dark;
 }

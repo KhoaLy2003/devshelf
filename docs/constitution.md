@@ -4,9 +4,9 @@
 
 - **Status**: `approved`
 - **Project**: DevShelf
-- **Version**: 1.0.0
+- **Version**: 1.1.0
 - **Ratified**: 2026-10-12
-- **Last amended**: 2026-10-12
+- **Last amended**: 2026-10-11
 - **Based on**: `architecture.md`, `DESIGN.md`, `roadmap.md`
 
 > Read by every Phase 2 step. Every principle must change at least one downstream plan or diff. Personal workflow preferences do not belong here.
@@ -111,5 +111,10 @@ Solo project: update this file directly, bump `Version` per the Versioning Polic
 
 ### Compliance Review
 
-- Each Phase 2 plan states which principles it touches.
 - The review step flags any violation explicitly. Violations are not silently fixed.
+
+---
+
+## Spec Evolution
+
+**Model: Flow-forward.** Shipped feature directories under `docs/specs/<feature-slug>/` are immutable historical records. A change to a shipped feature gets a new directory (`docs/specs/<feature-slug>-v2/`) and its own Phase 2 cycle from Step 1, which references the original spec and states what changed and why. Original directories are not edited after ship.
