@@ -469,7 +469,7 @@ pub fn workspace_restore(
 #[derive(Debug)]
 struct RestoreRun {
     report: RestoreReport,
-    /// Set when the run completed but `last_restored_at` could not be saved.
+    /// Set when the run completed but the restore outcome could not be saved.
     save_error: Option<WorkspaceError>,
 }
 
@@ -481,12 +481,22 @@ fn run_restore(
 ) -> Result<RestoreRun, WorkspaceError> {
     let plan = with_storage(state, |s| restore::load_plan(s, workspace_id))?;
     let report = restore::run_plan(probe, launcher, plan);
-    let save_error = if report.completed {
-        with_storage(state, |s| restore::mark_restored(s, workspace_id)).err()
-    } else {
-        None
-    };
+    let save_error = record_restore(state, &report);
     Ok(RestoreRun { report, save_error })
+}
+
+/// Stores the outcome of a run, only when it completed: the time and the count of `Missing`
+/// plus `Unreachable` items. A save failure is returned so the caller can keep the report.
+fn record_restore(state: &StorageState, report: &RestoreReport) -> Option<WorkspaceError> {
+    if !report.completed {
+        return None;
+    }
+    let missing = report
+        .outcomes
+        .iter()
+        .filter(|o| matches!(o, ItemOutcome::Missing { .. } | ItemOutcome::Unreachable { .. }))
+        .count() as i64;
+    with_storage(state, |s| workspaces::set_restore_outcome(s, report.workspace_id, missing)).err()
 }
 
 /// Replays a probe result taken before the lock, so the locked update does no file system work.
@@ -783,6 +793,51 @@ mod tests {
         assert_eq!(wire.error, Some(WorkspaceErrorCode::StorageUnavailable));
         let got = with_storage(&state, |s| Ok(workspaces::get(s, w.id)?.unwrap())).unwrap();
         assert!(got.last_restored_at.is_none());
+    }
+
+    #[test]
+    fn run_restore_stores_the_missing_count_of_a_completed_run() {
+        let (t, st) = temp_storage();
+        let w = workspaces::create(&st, "W").unwrap();
+        let mut files = Vec::new();
+        for name in ["a.txt", "b.txt", "c.txt"] {
+            let file = t.path().join(name);
+            std::fs::write(&file, b"").unwrap();
+            let (path, kind) = workspaces::validate_item_path(&file.to_string_lossy()).unwrap();
+            workspaces::add_item(&st, w.id, &path, &kind, None, "windows_default").unwrap();
+            files.push(file);
+        }
+        std::fs::remove_file(&files[0]).unwrap();
+        std::fs::remove_file(&files[1]).unwrap();
+        let state = state_with(st, t.path());
+
+        let launcher = CountingLauncher(std::cell::Cell::new(0));
+        let run = run_restore(&state, w.id, &FsProbe, &launcher).unwrap();
+        assert!(run.report.completed);
+        assert!(run.save_error.is_none());
+        assert_eq!(launcher.0.get(), 1);
+        let home = with_storage(&state, workspaces::list_for_home).unwrap();
+        assert_eq!(home[0].last_restore_missing, 2);
+        assert!(home[0].last_restored_at.is_some());
+    }
+
+    #[test]
+    fn a_run_that_did_not_complete_stores_nothing() {
+        let (t, st) = temp_storage();
+        let w = workspaces::create(&st, "W").unwrap();
+        let state = state_with(st, t.path());
+        let report = RestoreReport {
+            workspace_id: w.id,
+            outcomes: vec![
+                ItemOutcome::Missing { item_id: 1, reason: MissingReason::NotFound },
+                ItemOutcome::Unreachable { item_id: 2 },
+            ],
+            completed: false,
+        };
+        assert!(record_restore(&state, &report).is_none());
+        let home = with_storage(&state, workspaces::list_for_home).unwrap();
+        assert_eq!(home[0].last_restored_at, None);
+        assert_eq!(home[0].last_restore_missing, 0);
     }
 
     #[test]

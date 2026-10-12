@@ -315,3 +315,32 @@ export interface ItemRelinkArgs {
   item_id: number;
   path: string;
 }
+
+export type HomeErrorCode = "storage_unavailable";
+
+export type HomeOverviewArgs = Record<string, never>;
+
+export interface HomeProjectView {
+  id: number;
+  display_name: string;
+  root_path: string;
+  drive: string;
+}
+
+export interface HomeWorkspaceView {
+  id: number;
+  name: string;
+  item_count: number;
+  project_names: string[];
+  last_restored_at: string | null;
+  last_restore_missing: number;
+}
+
+export interface HomeOverviewResult {
+  pinned_projects: HomeProjectView[];
+  recent_workspaces: HomeWorkspaceView[];
+  project_count: number;
+  workspace_count: number;
+  error: HomeErrorCode | null;
+  detail: string | null;
+}

@@ -110,6 +110,7 @@ export function WorkspaceDetailScreen() {
       detail: null,
     });
     void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+    void queryClient.invalidateQueries({ queryKey: ["home"] });
     return result.workspace;
   };
 
@@ -176,6 +177,7 @@ export function WorkspaceDetailScreen() {
       }
       void navigate("/workspaces");
       void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      void queryClient.invalidateQueries({ queryKey: ["home"] });
       queryClient.removeQueries({ queryKey: ["workspace", id] });
       return;
     } catch {
@@ -210,6 +212,7 @@ export function WorkspaceDetailScreen() {
       }
       if (result.completed) {
         void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+        void queryClient.invalidateQueries({ queryKey: ["home"] });
         void queryClient.invalidateQueries({ queryKey: ["workspace", id] });
       }
     } catch {
@@ -362,6 +365,7 @@ export function WorkspaceDetailScreen() {
               detail: null,
             });
             void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+            void queryClient.invalidateQueries({ queryKey: ["home"] });
           }}
         />
       ) : null}
@@ -539,6 +543,7 @@ export function WorkspaceDetailScreen() {
               detail: null,
             });
             void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+            void queryClient.invalidateQueries({ queryKey: ["home"] });
             setAddOpen(false);
           }}
         />

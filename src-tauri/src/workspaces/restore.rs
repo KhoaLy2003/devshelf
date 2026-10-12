@@ -173,21 +173,6 @@ pub fn restore(
     Ok(run_plan(probe, launcher, load_plan(storage, workspace_id)?))
 }
 
-/// Sets `last_restored_at` to now (UTC, ISO 8601). Call only when a run completed.
-pub fn mark_restored(storage: &Storage, workspace_id: i64) -> Result<(), WorkspaceError> {
-    let changed = storage
-        .connection()
-        .execute(
-            "UPDATE workspaces SET last_restored_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE id = ?1",
-            [workspace_id],
-        )
-        .map_err(storage_failure)?;
-    if changed == 0 {
-        return Err(WorkspaceError::new(WorkspaceCode::WorkspaceNotFound));
-    }
-    Ok(())
-}
-
 /// Points an existing item at a new path. Shape rules as `validate_item_path`; existence and
 /// kind come from `probe`; the kind must equal the stored kind. Opens nothing; id and
 /// position are unchanged.
@@ -506,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    fn mark_restored_is_the_only_writer_of_last_restored_at() {
+    fn set_restore_outcome_is_the_only_writer_of_last_restored_at() {
         let tmp = tempfile::tempdir().unwrap();
         let storage = store(tmp.path());
         let ws = create(&storage, "Ops").unwrap().id;
@@ -519,7 +504,7 @@ mod tests {
         assert_eq!(get(&storage, ws).unwrap().unwrap().last_restored_at, None);
         assert_eq!(crate::workspaces::list(&storage).unwrap()[0].last_restored_at, None);
 
-        mark_restored(&storage, ws).unwrap();
+        crate::workspaces::set_restore_outcome(&storage, ws, 0).unwrap();
         let stamp = get(&storage, ws).unwrap().unwrap().last_restored_at.unwrap();
         assert_eq!(stamp.len(), 20, "{stamp}");
         assert!(stamp.ends_with('Z') && stamp.contains('T'), "{stamp}");
@@ -529,7 +514,7 @@ mod tests {
         );
 
         assert_eq!(
-            mark_restored(&storage, 99).unwrap_err().code,
+            crate::workspaces::set_restore_outcome(&storage, 99, 0).unwrap_err().code,
             WorkspaceCode::WorkspaceNotFound
         );
     }
@@ -541,7 +526,7 @@ mod tests {
         {
             let storage = store(tmp.path());
             ws = create(&storage, "Ops").unwrap().id;
-            mark_restored(&storage, ws).unwrap();
+            crate::workspaces::set_restore_outcome(&storage, ws, 0).unwrap();
         }
         let reopened = store(tmp.path());
         assert!(get(&reopened, ws).unwrap().unwrap().last_restored_at.is_some());

@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AppInfo,
+  HomeOverviewArgs,
+  HomeOverviewResult,
   EditorOpenArgs,
   EditorOpenResult,
   EditorPickExecutableArgs,
@@ -174,4 +176,9 @@ export function restoreWorkspace(id: number): Promise<WorkspaceRestoreResult> {
 export function relinkWorkspaceItem(itemId: number, path: string): Promise<WorkspaceResult> {
   const args: ItemRelinkArgs = { item_id: itemId, path };
   return invoke<WorkspaceResult>("workspace_items_relink", { args });
+}
+
+export function getHomeOverview(): Promise<HomeOverviewResult> {
+  const args: HomeOverviewArgs = {};
+  return invoke<HomeOverviewResult>("home_overview", { args });
 }

@@ -200,13 +200,72 @@ fn is_unique_violation(e: &rusqlite::Error) -> bool {
 /// Summaries sorted by name (case-insensitive). `project_names` lists the distinct names of
 /// registered projects referenced by items, sorted case-insensitively.
 pub fn list(storage: &Storage) -> Result<Vec<WorkspaceSummary>, WorkspaceError> {
-    let conn = storage.connection();
-    let mut stmt = conn
-        .prepare(
-            "SELECT w.id, w.name, (SELECT COUNT(*) FROM workspace_items i WHERE i.workspace_id = w.id), w.last_restored_at \
-             FROM workspaces w ORDER BY w.name_key, w.id",
+    Ok(load_summaries(storage, "w.name_key, w.id")?.into_iter().map(|(s, _)| s).collect())
+}
+
+/// A workspace as the Home overview shows it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HomeWorkspace {
+    pub id: i64,
+    pub name: String,
+    pub item_count: i64,
+    pub project_names: Vec<String>,
+    pub last_restored_at: Option<String>,
+    pub last_restore_missing: i64,
+}
+
+/// Recent-first: restored workspaces by `last_restored_at` descending, then never-restored
+/// ones by name key.
+pub fn list_for_home(storage: &Storage) -> Result<Vec<HomeWorkspace>, WorkspaceError> {
+    let rows = load_summaries(
+        storage,
+        "(w.last_restored_at IS NULL), w.last_restored_at DESC, w.name_key, w.id",
+    )?;
+    Ok(rows
+        .into_iter()
+        .map(|(s, last_restore_missing)| HomeWorkspace {
+            id: s.id,
+            name: s.name,
+            item_count: s.item_count,
+            project_names: s.project_names,
+            last_restored_at: s.last_restored_at,
+            last_restore_missing,
+        })
+        .collect())
+}
+
+/// Stores the outcome of a completed restore: `last_restored_at` = now (UTC, ISO 8601) and the
+/// count of missing items. Call only when a run completed.
+pub fn set_restore_outcome(
+    storage: &Storage,
+    workspace_id: i64,
+    missing: i64,
+) -> Result<(), WorkspaceError> {
+    let changed = storage
+        .connection()
+        .execute(
+            "UPDATE workspaces SET last_restored_at = strftime('%Y-%m-%dT%H:%M:%SZ','now'), \
+             last_restore_missing = ?2 WHERE id = ?1",
+            params![workspace_id, missing],
         )
         .map_err(storage_failure)?;
+    if changed == 0 {
+        return Err(WorkspaceError::new(WorkspaceCode::WorkspaceNotFound));
+    }
+    Ok(())
+}
+
+/// `order_by` is a compile-time constant from this module, never user input.
+fn load_summaries(
+    storage: &Storage,
+    order_by: &'static str,
+) -> Result<Vec<(WorkspaceSummary, i64)>, WorkspaceError> {
+    let conn = storage.connection();
+    let sql = format!(
+        "SELECT w.id, w.name, (SELECT COUNT(*) FROM workspace_items i WHERE i.workspace_id = w.id), \
+         w.last_restored_at, w.last_restore_missing FROM workspaces w ORDER BY {order_by}"
+    );
+    let mut stmt = conn.prepare(&sql).map_err(storage_failure)?;
     let base = stmt
         .query_map([], |r| {
             Ok((
@@ -214,6 +273,7 @@ pub fn list(storage: &Storage) -> Result<Vec<WorkspaceSummary>, WorkspaceError> 
                 r.get::<_, String>(1)?,
                 r.get::<_, i64>(2)?,
                 r.get::<_, Option<String>>(3)?,
+                r.get::<_, i64>(4)?,
             ))
         })
         .map_err(storage_failure)?
@@ -224,7 +284,7 @@ pub fn list(storage: &Storage) -> Result<Vec<WorkspaceSummary>, WorkspaceError> 
         .map_err(storage_failure)?;
     let projects = crate::projects::list(storage).map_err(storage_failure)?;
     let mut out = Vec::with_capacity(base.len());
-    for (id, name, item_count, last_restored_at) in base {
+    for (id, name, item_count, last_restored_at, missing) in base {
         let ids = item_stmt
             .query_map([id], |r| r.get::<_, i64>(0))
             .map_err(storage_failure)?
@@ -236,7 +296,7 @@ pub fn list(storage: &Storage) -> Result<Vec<WorkspaceSummary>, WorkspaceError> 
             .map(|p| p.display_name.clone())
             .collect();
         project_names.sort_by_key(|n| n.to_lowercase());
-        out.push(WorkspaceSummary { id, name, item_count, last_restored_at, project_names });
+        out.push((WorkspaceSummary { id, name, item_count, last_restored_at, project_names }, missing));
     }
     Ok(out)
 }
@@ -731,6 +791,108 @@ mod tests {
         add(&st, w.id, &file(t.path(), "a")).unwrap();
         let sum = list(&st).unwrap();
         assert_eq!(sum[0].item_count, 1);
+    }
+
+    fn stamp(st: &Storage, id: i64, at: &str) {
+        st.connection()
+            .execute("UPDATE workspaces SET last_restored_at = ?2 WHERE id = ?1", params![id, at])
+            .unwrap();
+    }
+
+    #[test]
+    fn set_restore_outcome_sets_both_fields_and_overwrites() {
+        let (_t, st) = store();
+        let w = create(&st, "W").unwrap();
+        set_restore_outcome(&st, w.id, 3).unwrap();
+        let first = list_for_home(&st).unwrap().remove(0);
+        assert_eq!(first.last_restore_missing, 3);
+        let at = first.last_restored_at.expect("stamp set");
+        assert!(at.len() == 20 && at.ends_with('Z') && at.contains('T'), "{at}");
+
+        stamp(&st, w.id, "2000-01-01T00:00:00Z");
+        set_restore_outcome(&st, w.id, 0).unwrap();
+        let second = list_for_home(&st).unwrap().remove(0);
+        assert_eq!(second.last_restore_missing, 0);
+        assert_ne!(second.last_restored_at.as_deref(), Some("2000-01-01T00:00:00Z"));
+        assert_eq!(
+            set_restore_outcome(&st, 99, 1).unwrap_err().code,
+            WorkspaceCode::WorkspaceNotFound
+        );
+    }
+
+    #[test]
+    fn last_restore_missing_defaults_to_zero() {
+        let (_t, st) = store();
+        create(&st, "W").unwrap();
+        let home = list_for_home(&st).unwrap();
+        assert_eq!(home[0].last_restore_missing, 0);
+        assert_eq!(home[0].last_restored_at, None);
+    }
+
+    #[test]
+    fn list_for_home_orders_restored_desc_then_never_restored_by_name() {
+        let (_t, st) = store();
+        let never_b = create(&st, "beta").unwrap();
+        let old = create(&st, "Zulu").unwrap();
+        let never_a = create(&st, "Alpha").unwrap();
+        let new = create(&st, "Mike").unwrap();
+        stamp(&st, old.id, "2024-01-01T00:00:00Z");
+        stamp(&st, new.id, "2025-06-01T12:00:00Z");
+        let ids: Vec<i64> = list_for_home(&st).unwrap().iter().map(|w| w.id).collect();
+        assert_eq!(ids, vec![new.id, old.id, never_a.id, never_b.id]);
+    }
+
+    #[test]
+    fn list_for_home_matches_summary_counts_and_project_names() {
+        let (t, st) = store();
+        let proj_dir = t.path().join("projects");
+        std::fs::create_dir_all(proj_dir.join("p1")).unwrap();
+        std::fs::create_dir_all(proj_dir.join("p2")).unwrap();
+        let register = |sub: &str, name: &str| {
+            let path = crate::projects::validate_path(&s(&proj_dir.join(sub))).unwrap();
+            crate::projects::register(
+                &st,
+                path,
+                crate::projects::NewProject {
+                    display_name: name.to_string(),
+                    project_type: "Other".to_string(),
+                    tags_raw: String::new(),
+                },
+            )
+            .unwrap()
+        };
+        let p1 = register("p1", "zeta");
+        let p2 = register("p2", "Alpha");
+        let w = create(&st, "W").unwrap();
+        let (n1, k1) = validate_item_path(&file(t.path(), "a")).unwrap();
+        add_item(&st, w.id, &n1, &k1, Some(p1.id), "windows_default").unwrap();
+        let (n2, k2) = validate_item_path(&file(t.path(), "b")).unwrap();
+        add_item(&st, w.id, &n2, &k2, Some(p2.id), "windows_default").unwrap();
+        add(&st, w.id, &file(t.path(), "c")).unwrap();
+
+        let sum = list(&st).unwrap().remove(0);
+        let home = list_for_home(&st).unwrap().remove(0);
+        assert_eq!(home.item_count, 3);
+        assert_eq!(home.item_count, sum.item_count);
+        assert_eq!(home.project_names, vec!["Alpha", "zeta"]);
+        assert_eq!(home.project_names, sum.project_names);
+        assert_eq!(home.name, sum.name);
+    }
+
+    #[test]
+    fn restore_missing_count_survives_reopen() {
+        let tmp = tempfile::tempdir().unwrap();
+        let data = tmp.path().join("data");
+        let id;
+        {
+            let st = open_in(&data).unwrap();
+            id = create(&st, "W").unwrap().id;
+            set_restore_outcome(&st, id, 4).unwrap();
+        }
+        let st = open_in(&data).unwrap();
+        let home = list_for_home(&st).unwrap();
+        assert_eq!(home[0].id, id);
+        assert_eq!(home[0].last_restore_missing, 4);
     }
 
     fn snapshot(dir: &Path) -> Vec<(String, std::time::SystemTime)> {

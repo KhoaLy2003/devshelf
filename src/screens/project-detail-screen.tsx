@@ -28,6 +28,7 @@ export function ProjectDetailScreen() {
     onSettled: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["projects"] }),
+        queryClient.invalidateQueries({ queryKey: ["home"] }),
         queryClient.invalidateQueries({ queryKey: ["project", id] }),
       ]);
     },

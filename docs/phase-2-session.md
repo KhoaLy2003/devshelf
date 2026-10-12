@@ -122,3 +122,23 @@ Open gaps for the Step 6 reviewer:
 - Unreachable group never displayed in the UI E2E (no safe unreachable path). Covered by Rust tests only.
 - Dev-mode run, not the built app (constitution P4), still outstanding for F01–F05.
 - Two earlier advisories (M2 command-mapping tests; WorkspaceFormContract lint/tsc) were checked: the tests exist and tsc, build and lint pass.
+
+## home-overview
+
+| Step | Name | Agent | Status | Output |
+|---|---|---|---|---|
+| 1 | Spec | brainstorming | complete | docs/specs/home-overview/spec.md (approved; D1 heading only; D2 Register navigates to Projects; D3 stored missing count) |
+| 2 | Plan | writing-plans | complete | docs/specs/home-overview/plan.md |
+| 3 | Implement | task (Rust), frontend-developer (UI) | complete | branch `feature/home-overview` (cut from fbf18da); not committed. Red-first step skipped for the domain tests (process deviation) |
+| 4 | Review | code-reviewer | complete | CHANGES REQUIRED: 1 major (Home stale after restore; fixed with refetch on visit and invalidations), 4 minor (1 spec status fixed, 1 comment fixed, 2 accepted) |
+| 5 | E2E | task (dev-mode run) | complete with 1 FAIL fixed (empty state wrongly shown with unpinned projects; now counts projects and workspaces per AC-42); 19 PASS, 2 FAIL (fixed), 4 BLOCKED | docs/E2E-TESTS-F10.md + re-check section |
+| 6 | Manual Check | Human | pending (hard gate) | — |
+| 7 | Ship | finishing-a-development-branch | pending | — |
+
+Verification at fix close: `npx tsc --noEmit` ok; `npm run build` ok; `npm run lint` ok; `npx vitest run` 98 pass; `cargo test --lib` 131 pass; `cargo build` 0 warnings.
+
+Open gaps for the Step 6 reviewer:
+- BLOCKED: AC-23 (more than 6 pinned), AC-35 (more than 6 recent), AC-42 full run (projects cannot be removed; the empty state was verified by logic and the re-check shows sections instead), storage-failure state (needs broken DB).
+- Date format differs between Home ("12 Oct 2026, 19:37") and the Workspaces list ("10/12/2026, 7:06:37 PM"). Not fixed; decide one format at Step 6.
+- Dev-mode run, not the built app (constitution P4), still outstanding for F01–F10.
+- The re-check cleanup used a name-based kill of node.exe, which may have ended unrelated Node processes.

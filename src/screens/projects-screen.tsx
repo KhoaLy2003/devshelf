@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Link } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router";
 import { EmptyState } from "../components/empty-state";
 import { RegisterProjectDialog } from "../components/register-project-dialog";
 import { listProjects } from "../lib/commands";
@@ -11,7 +11,17 @@ const registerButtonClass =
 
 export function ProjectsScreen() {
   const query = useQuery({ queryKey: ["projects"], queryFn: listProjects });
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [dialogOpen, setDialogOpen] = useState(
+    () => (location.state as { openRegister?: boolean } | null)?.openRegister === true,
+  );
+  useEffect(() => {
+    if ((location.state as { openRegister?: boolean } | null)?.openRegister === true) {
+      navigate(".", { replace: true, state: null });
+    }
+    // Read once on mount: the state is cleared right after it opens the dialog.
+  }, []);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 

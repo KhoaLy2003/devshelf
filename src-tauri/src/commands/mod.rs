@@ -1,4 +1,5 @@
 pub mod editors;
+pub mod home;
 pub mod projects;
 pub mod storage;
 pub mod workspaces;

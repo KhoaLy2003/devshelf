@@ -1,6 +1,6 @@
 use rusqlite_migration::{Migrations, M};
 
-pub const MIGRATIONS_COUNT: usize = 5;
+pub const MIGRATIONS_COUNT: usize = 6;
 
 pub fn migrations() -> Migrations<'static> {
     Migrations::new(vec![
@@ -58,5 +58,6 @@ CREATE TABLE workspace_items (
 );",
         ),
         M::up("ALTER TABLE workspaces ADD COLUMN last_restored_at TEXT;"),
+        M::up("ALTER TABLE workspaces ADD COLUMN last_restore_missing INTEGER NOT NULL DEFAULT 0;"),
     ])
 }
