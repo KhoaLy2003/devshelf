@@ -32,6 +32,7 @@ import type {
   ItemMoveArgs,
   ItemRemoveArgs,
   ItemUpdateArgs,
+  ItemRelinkArgs,
   WorkspaceCreateArgs,
   WorkspaceDeleteArgs,
   WorkspaceDeleteResult,
@@ -40,6 +41,8 @@ import type {
   WorkspacePickResult,
   WorkspaceRenameArgs,
   WorkspaceResult,
+  WorkspaceRestoreArgs,
+  WorkspaceRestoreResult,
   WorkspacesListArgs,
   WorkspacesListResult,
 } from "../types/commands";
@@ -161,4 +164,14 @@ export function moveWorkspaceItem(itemId: number, up: boolean): Promise<Workspac
 export function pickWorkspaceItem(folder: boolean): Promise<WorkspacePickResult> {
   const args: WorkspacePickItemArgs = { folder };
   return invoke<WorkspacePickResult>("workspaces_pick_item", { args });
+}
+
+export function restoreWorkspace(id: number): Promise<WorkspaceRestoreResult> {
+  const args: WorkspaceRestoreArgs = { id };
+  return invoke<WorkspaceRestoreResult>("workspace_restore", { args });
+}
+
+export function relinkWorkspaceItem(itemId: number, path: string): Promise<WorkspaceResult> {
+  const args: ItemRelinkArgs = { item_id: itemId, path };
+  return invoke<WorkspaceResult>("workspace_items_relink", { args });
 }

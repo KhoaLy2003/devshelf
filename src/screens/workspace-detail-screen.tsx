@@ -10,10 +10,17 @@ import {
   moveWorkspaceItem,
   removeWorkspaceItem,
   renameWorkspace,
+  restoreWorkspace,
   updateWorkspaceItem,
 } from "../lib/commands";
+import { RestorePanel } from "../components/restore-panel";
 import { formatWorkspaceError, kindLabel } from "../lib/workspace-form";
-import type { WorkspaceItemView, WorkspaceResult, WorkspaceView } from "../types/commands";
+import type {
+  RestoreOutcomeView,
+  WorkspaceItemView,
+  WorkspaceResult,
+  WorkspaceView,
+} from "../types/commands";
 
 const linkClass =
   "text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
@@ -54,6 +61,9 @@ export function WorkspaceDetailScreen() {
   const [addOpen, setAddOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [outcomes, setOutcomes] = useState<RestoreOutcomeView[] | null>(null);
+  const [runId, setRunId] = useState(0);
 
   const back = (
     <Link to="/workspaces" className={linkClass}>
@@ -180,6 +190,36 @@ export function WorkspaceDetailScreen() {
     await runItemMutation(() => removeWorkspaceItem(item.id));
   };
 
+  const runRestore = async () => {
+    if (restoring) {
+      return;
+    }
+    setRestoring(true);
+    setNotice(null);
+    try {
+      const result = await restoreWorkspace(id);
+      if (!result.completed && result.error !== null) {
+        setOutcomes(null);
+        setNotice(formatWorkspaceError(result.error, result.detail, workspace.name));
+        return;
+      }
+      setRunId((current) => current + 1);
+      setOutcomes(result.outcomes);
+      if (result.error !== null) {
+        setNotice(formatWorkspaceError(result.error, result.detail, workspace.name));
+      }
+      if (result.completed) {
+        void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+        void queryClient.invalidateQueries({ queryKey: ["workspace", id] });
+      }
+    } catch {
+      setOutcomes(null);
+      setNotice(formatWorkspaceError("storage_unavailable", null, workspace.name));
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   const changeItem = (item: WorkspaceItemView, projectId: number | null, editorKind: string) =>
     runItemMutation(() =>
       updateWorkspaceItem({ item_id: item.id, project_id: projectId, editor_kind: editorKind }),
@@ -280,19 +320,50 @@ export function WorkspaceDetailScreen() {
         </div>
       ) : null}
 
-      <div className="mb-6 mt-4 flex items-center justify-between gap-4">
+      <div className="mb-2 mt-4 flex items-center justify-between gap-4">
         <p className="m-0 text-ink-muted">
           {items.length} {items.length === 1 ? "item" : "items"}, reopened in this order.
         </p>
-        <button type="button" onClick={() => setAddOpen(true)} className={buttonPrimary}>
-          Add item
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => void runRestore()}
+            disabled={items.length === 0 || restoring || busy}
+            className={buttonPrimary}
+          >
+            {restoring ? "Restoring…" : "Restore"}
+          </button>
+          <button type="button" onClick={() => setAddOpen(true)} className={buttonSecondary}>
+            Add item
+          </button>
+        </div>
       </div>
+      <p className="m-0 mb-6 text-sm text-ink-muted">
+        Restore reopens files and folders. Editor tab layout and unsaved changes are not restored.
+      </p>
 
       {notice !== null ? (
         <p role="alert" className="m-0 mb-6 text-warning">
           {notice}
         </p>
+      ) : null}
+
+      {outcomes !== null ? (
+        <RestorePanel
+          key={runId}
+          outcomes={outcomes}
+          items={items}
+          profiles={profiles}
+          onClose={() => setOutcomes(null)}
+          onRelinked={(updated) => {
+            queryClient.setQueryData(["workspace", id], {
+              workspace: updated,
+              error: null,
+              detail: null,
+            });
+            void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+          }}
+        />
       ) : null}
 
       {items.length === 0 ? (

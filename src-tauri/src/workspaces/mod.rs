@@ -9,6 +9,8 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use crate::db::Storage;
 use crate::projects::normalize_path;
 
+pub mod restore;
+
 pub const MAX_NAME_CHARS: usize = 100;
 pub const MAX_PATH_CHARS: usize = 260;
 
@@ -22,12 +24,14 @@ pub enum WorkspaceCode {
     ItemPathTooLong,
     ItemRelativePath,
     ItemPathNotFound,
+    ItemPathUnreachable,
     ItemDuplicate,
     ItemNotFound,
     ProjectNotFound,
     ProfileNotFound,
     MoveBlocked,
     StorageUnavailable,
+    ItemKindMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,6 +66,8 @@ pub struct Workspace {
     pub id: i64,
     pub name: String,
     pub items: Vec<Item>,
+    /// UTC ISO timestamp of the last completed restore.
+    pub last_restored_at: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -69,6 +75,7 @@ pub struct WorkspaceSummary {
     pub id: i64,
     pub name: String,
     pub item_count: i64,
+    pub last_restored_at: Option<String>,
     pub project_names: Vec<String>,
 }
 
@@ -106,9 +113,9 @@ fn is_absolute_shape(normalized: &str) -> bool {
     }
 }
 
-/// Returns `(normalised path, kind)`. Checks in order: empty, too long, absolute, exists.
-/// Reads only `std::fs::metadata`; run before taking the storage lock.
-pub fn validate_item_path(raw: &str) -> Result<(String, String), WorkspaceError> {
+/// Normalises and checks shape only, in order: empty, too long, absolute, no `..`. Touches no
+/// file system.
+pub(crate) fn validate_item_shape(raw: &str) -> Result<String, WorkspaceError> {
     let normalized = normalize_path(raw);
     if normalized.is_empty() {
         return Err(WorkspaceError::new(WorkspaceCode::ItemPathEmpty));
@@ -122,6 +129,13 @@ pub fn validate_item_path(raw: &str) -> Result<(String, String), WorkspaceError>
     if normalized.split('\\').any(|part| part == "..") {
         return Err(WorkspaceError::with_detail(WorkspaceCode::ItemPathNotFound, &normalized));
     }
+    Ok(normalized)
+}
+
+/// Returns `(normalised path, kind)`. Checks in order: empty, too long, absolute, exists.
+/// Reads only `std::fs::metadata`; run before taking the storage lock.
+pub fn validate_item_path(raw: &str) -> Result<(String, String), WorkspaceError> {
+    let normalized = validate_item_shape(raw)?;
     match std::fs::metadata(&normalized) {
         Ok(meta) if meta.is_dir() => Ok((normalized, "folder".to_string())),
         Ok(_) => Ok((normalized, "file".to_string())),
@@ -156,12 +170,16 @@ fn load_items(conn: &Connection, workspace_id: i64) -> Result<Vec<Item>, Workspa
 }
 
 fn load_workspace(conn: &Connection, id: i64) -> Result<Option<Workspace>, WorkspaceError> {
-    let name: Option<String> = conn
-        .query_row("SELECT name FROM workspaces WHERE id = ?1", [id], |r| r.get(0))
+    let row: Option<(String, Option<String>)> = conn
+        .query_row("SELECT name, last_restored_at FROM workspaces WHERE id = ?1", [id], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })
         .optional()
         .map_err(storage_failure)?;
-    match name {
-        Some(name) => Ok(Some(Workspace { id, name, items: load_items(conn, id)? })),
+    match row {
+        Some((name, last_restored_at)) => {
+            Ok(Some(Workspace { id, name, items: load_items(conn, id)?, last_restored_at }))
+        }
         None => Ok(None),
     }
 }
@@ -185,12 +203,19 @@ pub fn list(storage: &Storage) -> Result<Vec<WorkspaceSummary>, WorkspaceError> 
     let conn = storage.connection();
     let mut stmt = conn
         .prepare(
-            "SELECT w.id, w.name, (SELECT COUNT(*) FROM workspace_items i WHERE i.workspace_id = w.id) \
+            "SELECT w.id, w.name, (SELECT COUNT(*) FROM workspace_items i WHERE i.workspace_id = w.id), w.last_restored_at \
              FROM workspaces w ORDER BY w.name_key, w.id",
         )
         .map_err(storage_failure)?;
     let base = stmt
-        .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, i64>(2)?)))
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, i64>(2)?,
+                r.get::<_, Option<String>>(3)?,
+            ))
+        })
         .map_err(storage_failure)?
         .collect::<Result<Vec<_>, _>>()
         .map_err(storage_failure)?;
@@ -199,7 +224,7 @@ pub fn list(storage: &Storage) -> Result<Vec<WorkspaceSummary>, WorkspaceError> 
         .map_err(storage_failure)?;
     let projects = crate::projects::list(storage).map_err(storage_failure)?;
     let mut out = Vec::with_capacity(base.len());
-    for (id, name, item_count) in base {
+    for (id, name, item_count, last_restored_at) in base {
         let ids = item_stmt
             .query_map([id], |r| r.get::<_, i64>(0))
             .map_err(storage_failure)?
@@ -211,7 +236,7 @@ pub fn list(storage: &Storage) -> Result<Vec<WorkspaceSummary>, WorkspaceError> 
             .map(|p| p.display_name.clone())
             .collect();
         project_names.sort_by_key(|n| n.to_lowercase());
-        out.push(WorkspaceSummary { id, name, item_count, project_names });
+        out.push(WorkspaceSummary { id, name, item_count, last_restored_at, project_names });
     }
     Ok(out)
 }

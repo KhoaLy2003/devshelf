@@ -23,6 +23,8 @@ export function formatWorkspaceError(
       return "Enter an absolute path, for example `F:\\work\\notes.txt`.";
     case "item_path_not_found":
       return `\`${detail ?? ""}\` was not found.`;
+    case "item_path_unreachable":
+      return `\`${detail ?? ""}\` can't be reached. The drive may not be ready or the network path is unavailable.`;
     case "item_duplicate":
       return `\`${detail ?? ""}\` is already in this workspace.`;
     case "item_not_found":
@@ -33,6 +35,10 @@ export function formatWorkspaceError(
       return "That editor profile no longer exists.";
     case "move_blocked":
       return "This item is already at that end of the list.";
+    case "item_kind_mismatch":
+      return detail === "folder"
+        ? "This is a file. Pick a folder."
+        : "This is a folder. Pick a file.";
     case "storage_unavailable":
       return "DevShelf cannot reach its data folder. Restart DevShelf and try again.";
   }

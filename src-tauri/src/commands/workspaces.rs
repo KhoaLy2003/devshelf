@@ -4,8 +4,12 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::commands::storage::StorageState;
 use crate::db::Storage;
+use crate::commands::editors::{AppOpener, EditorErrorCode};
 use crate::editors;
 use crate::projects;
+use crate::workspaces::restore::{
+    self, FsProbe, ItemOutcome, MissingReason, PathProbe, ProbeResult, RestoreReport,
+};
 use crate::workspaces::{
     self, Item, Workspace, WorkspaceCode, WorkspaceError, WorkspaceSummary,
 };
@@ -22,12 +26,14 @@ pub enum WorkspaceErrorCode {
     ItemPathTooLong,
     ItemRelativePath,
     ItemPathNotFound,
+    ItemPathUnreachable,
     ItemDuplicate,
     ItemNotFound,
     ProjectNotFound,
     ProfileNotFound,
     MoveBlocked,
     StorageUnavailable,
+    ItemKindMismatch,
 }
 
 impl From<WorkspaceCode> for WorkspaceErrorCode {
@@ -41,12 +47,14 @@ impl From<WorkspaceCode> for WorkspaceErrorCode {
             WorkspaceCode::ItemPathTooLong => Self::ItemPathTooLong,
             WorkspaceCode::ItemRelativePath => Self::ItemRelativePath,
             WorkspaceCode::ItemPathNotFound => Self::ItemPathNotFound,
+            WorkspaceCode::ItemPathUnreachable => Self::ItemPathUnreachable,
             WorkspaceCode::ItemDuplicate => Self::ItemDuplicate,
             WorkspaceCode::ItemNotFound => Self::ItemNotFound,
             WorkspaceCode::ProjectNotFound => Self::ProjectNotFound,
             WorkspaceCode::ProfileNotFound => Self::ProfileNotFound,
             WorkspaceCode::MoveBlocked => Self::MoveBlocked,
             WorkspaceCode::StorageUnavailable => Self::StorageUnavailable,
+            WorkspaceCode::ItemKindMismatch => Self::ItemKindMismatch,
         }
     }
 }
@@ -79,6 +87,7 @@ pub struct WorkspaceView {
     pub id: i64,
     pub name: String,
     pub items: Vec<WorkspaceItemView>,
+    pub last_restored_at: Option<String>,
 }
 
 impl From<Workspace> for WorkspaceView {
@@ -87,6 +96,7 @@ impl From<Workspace> for WorkspaceView {
             id: w.id,
             name: w.name,
             items: w.items.into_iter().map(Into::into).collect(),
+            last_restored_at: w.last_restored_at,
         }
     }
 }
@@ -97,6 +107,7 @@ pub struct WorkspaceSummaryView {
     pub name: String,
     pub item_count: i64,
     pub project_names: Vec<String>,
+    pub last_restored_at: Option<String>,
 }
 
 impl From<WorkspaceSummary> for WorkspaceSummaryView {
@@ -106,6 +117,7 @@ impl From<WorkspaceSummary> for WorkspaceSummaryView {
             name: s.name,
             item_count: s.item_count,
             project_names: s.project_names,
+            last_restored_at: s.last_restored_at,
         }
     }
 }
@@ -188,6 +200,82 @@ pub struct WorkspaceDeleteResult {
 #[derive(Debug, Serialize)]
 pub struct WorkspacePickResult {
     pub path: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WorkspaceRestoreArgs {
+    pub id: i64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ItemRelinkArgs {
+    pub item_id: i64,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MissingReasonView {
+    NotFound,
+    NowFolder,
+    NowFile,
+}
+
+/// `kind` is one of `opened`, `missing`, `unreachable`, `could_not_open`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RestoreOutcomeView {
+    pub kind: &'static str,
+    pub item_id: i64,
+    pub reason: Option<MissingReasonView>,
+    pub code: Option<EditorErrorCode>,
+}
+
+impl From<ItemOutcome> for RestoreOutcomeView {
+    fn from(o: ItemOutcome) -> Self {
+        let (kind, item_id, reason, code) = match o {
+            ItemOutcome::Opened { item_id } => ("opened", item_id, None, None),
+            ItemOutcome::Missing { item_id, reason } => {
+                let reason = match reason {
+                    MissingReason::NotFound => MissingReasonView::NotFound,
+                    MissingReason::NowFolder => MissingReasonView::NowFolder,
+                    MissingReason::NowFile => MissingReasonView::NowFile,
+                };
+                ("missing", item_id, Some(reason), None)
+            }
+            ItemOutcome::Unreachable { item_id } => ("unreachable", item_id, None, None),
+            ItemOutcome::CouldNotOpen { item_id, code } => {
+                ("could_not_open", item_id, None, Some(code.into()))
+            }
+        };
+        Self { kind, item_id, reason, code }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct WorkspaceRestoreResult {
+    pub outcomes: Vec<RestoreOutcomeView>,
+    pub completed: bool,
+    pub error: Option<WorkspaceErrorCode>,
+    pub detail: Option<String>,
+}
+
+/// `error` with `completed: true` means the run finished and was reported, but recording the
+/// last-used time failed; `error` with `completed: false` means nothing ran.
+fn restore_result(r: Result<RestoreRun, WorkspaceError>) -> WorkspaceRestoreResult {
+    match r {
+        Ok(RestoreRun { report, save_error }) => WorkspaceRestoreResult {
+            outcomes: report.outcomes.into_iter().map(Into::into).collect(),
+            completed: report.completed,
+            error: save_error.as_ref().map(|e| e.code.into()),
+            detail: save_error.and_then(|e| e.detail),
+        },
+        Err(e) => WorkspaceRestoreResult {
+            outcomes: Vec::new(),
+            completed: false,
+            error: Some(e.code.into()),
+            detail: e.detail,
+        },
+    }
 }
 
 fn failure(code: WorkspaceCode) -> WorkspaceError {
@@ -366,6 +454,71 @@ pub fn workspace_items_move(
     }))
 }
 
+/// Runs off the main thread. Loads the plan under one lock, probes and launches with no lock
+/// held, then locks once more to record the completed run.
+#[tauri::command(async)]
+pub fn workspace_restore(
+    args: WorkspaceRestoreArgs,
+    state: State<'_, StorageState>,
+    app: AppHandle,
+) -> WorkspaceRestoreResult {
+    restore_result(run_restore(&state, args.id, &FsProbe, &AppOpener(&app)))
+}
+
+/// A finished run: the report always survives, even when recording the run failed.
+#[derive(Debug)]
+struct RestoreRun {
+    report: RestoreReport,
+    /// Set when the run completed but `last_restored_at` could not be saved.
+    save_error: Option<WorkspaceError>,
+}
+
+fn run_restore(
+    state: &StorageState,
+    workspace_id: i64,
+    probe: &dyn PathProbe,
+    launcher: &dyn editors::Launcher,
+) -> Result<RestoreRun, WorkspaceError> {
+    let plan = with_storage(state, |s| restore::load_plan(s, workspace_id))?;
+    let report = restore::run_plan(probe, launcher, plan);
+    let save_error = if report.completed {
+        with_storage(state, |s| restore::mark_restored(s, workspace_id)).err()
+    } else {
+        None
+    };
+    Ok(RestoreRun { report, save_error })
+}
+
+/// Replays a probe result taken before the lock, so the locked update does no file system work.
+struct ProbedOnce(ProbeResult);
+
+impl PathProbe for ProbedOnce {
+    fn probe(&self, _path: &str) -> ProbeResult {
+        self.0
+    }
+}
+
+/// Runs off the main thread. Shape check and probe run with no lock held; the lock covers the
+/// update only.
+#[tauri::command(async)]
+pub fn workspace_items_relink(
+    args: ItemRelinkArgs,
+    state: State<'_, StorageState>,
+) -> WorkspaceResult {
+    workspace_result(run_relink(&state, &FsProbe, args.item_id, &args.path))
+}
+
+fn run_relink(
+    state: &StorageState,
+    probe: &dyn PathProbe,
+    item_id: i64,
+    raw_path: &str,
+) -> Result<Workspace, WorkspaceError> {
+    let normalized = workspaces::validate_item_shape(raw_path)?;
+    let probed = ProbedOnce(probe.probe(&normalized));
+    with_storage(state, |s| restore::relink(s, &probed, item_id, &normalized))
+}
+
 fn path_string(p: tauri_plugin_dialog::FilePath) -> Option<String> {
     p.into_path()
         .ok()
@@ -391,9 +544,10 @@ pub async fn workspaces_pick_item(
 
 #[cfg(test)]
 mod tests {
+    use crate::editors::EditorCode;
     use super::*;
 
-    const ALL: [(WorkspaceCode, &str); 14] = [
+    const ALL: [(WorkspaceCode, &str); 16] = [
         (WorkspaceCode::NameEmpty, "name_empty"),
         (WorkspaceCode::NameTooLong, "name_too_long"),
         (WorkspaceCode::NameTaken, "name_taken"),
@@ -402,12 +556,14 @@ mod tests {
         (WorkspaceCode::ItemPathTooLong, "item_path_too_long"),
         (WorkspaceCode::ItemRelativePath, "item_relative_path"),
         (WorkspaceCode::ItemPathNotFound, "item_path_not_found"),
+        (WorkspaceCode::ItemPathUnreachable, "item_path_unreachable"),
         (WorkspaceCode::ItemDuplicate, "item_duplicate"),
         (WorkspaceCode::ItemNotFound, "item_not_found"),
         (WorkspaceCode::ProjectNotFound, "project_not_found"),
         (WorkspaceCode::ProfileNotFound, "profile_not_found"),
         (WorkspaceCode::MoveBlocked, "move_blocked"),
         (WorkspaceCode::StorageUnavailable, "storage_unavailable"),
+        (WorkspaceCode::ItemKindMismatch, "item_kind_mismatch"),
     ];
 
     #[test]
@@ -470,5 +626,189 @@ mod tests {
         assert!(r.workspace.is_none());
         assert_eq!(r.error, Some(WorkspaceCode::MoveBlocked.into()));
         assert_eq!(r.detail, None);
+    }
+
+    #[test]
+    fn new_codes_serialize_snake_case() {
+        let json = serde_json::to_string(&WorkspaceErrorCode::from(WorkspaceCode::ItemKindMismatch))
+            .unwrap();
+        assert_eq!(json, "\"item_kind_mismatch\"");
+    }
+
+    fn view_json(o: ItemOutcome) -> serde_json::Value {
+        serde_json::to_value(RestoreOutcomeView::from(o)).unwrap()
+    }
+
+    #[test]
+    fn opened_outcome_maps_to_opened_view() {
+        assert_eq!(
+            view_json(ItemOutcome::Opened { item_id: 3 }),
+            serde_json::json!({"kind": "opened", "item_id": 3, "reason": null, "code": null})
+        );
+    }
+
+    #[test]
+    fn missing_outcomes_carry_each_reason() {
+        for (reason, expected) in [
+            (MissingReason::NotFound, "not_found"),
+            (MissingReason::NowFolder, "now_folder"),
+            (MissingReason::NowFile, "now_file"),
+        ] {
+            assert_eq!(
+                view_json(ItemOutcome::Missing { item_id: 4, reason }),
+                serde_json::json!({"kind": "missing", "item_id": 4, "reason": expected, "code": null})
+            );
+        }
+    }
+
+    #[test]
+    fn unreachable_outcome_maps_to_unreachable_view() {
+        assert_eq!(
+            view_json(ItemOutcome::Unreachable { item_id: 5 }),
+            serde_json::json!({"kind": "unreachable", "item_id": 5, "reason": null, "code": null})
+        );
+    }
+
+    #[test]
+    fn could_not_open_outcome_carries_the_editor_code() {
+        assert_eq!(
+            view_json(ItemOutcome::CouldNotOpen {
+                item_id: 6,
+                code: EditorCode::ExecutableNotFound
+            }),
+            serde_json::json!({
+                "kind": "could_not_open", "item_id": 6, "reason": null, "code": "executable_not_found"
+            })
+        );
+    }
+
+    #[test]
+    fn restore_result_carries_error_and_detail() {
+        let r = restore_result(Err(WorkspaceError {
+            code: WorkspaceCode::ItemNotFound,
+            detail: Some("x".to_string()),
+        }));
+        assert!(r.outcomes.is_empty());
+        assert!(!r.completed);
+        assert_eq!(r.error, Some(WorkspaceErrorCode::ItemNotFound));
+        assert_eq!(r.detail.as_deref(), Some("x"));
+    }
+
+    struct CountingLauncher(std::cell::Cell<usize>);
+
+    impl editors::Launcher for CountingLauncher {
+        fn spawn(&self, _plan: &editors::LaunchPlan) -> std::io::Result<()> {
+            self.0.set(self.0.get() + 1);
+            Ok(())
+        }
+
+        fn open_default(&self, _item_path: &str) -> Result<(), String> {
+            self.0.set(self.0.get() + 1);
+            Ok(())
+        }
+    }
+
+    fn state_with(storage: Storage, folder: &std::path::Path) -> StorageState {
+        StorageState { folder: folder.to_path_buf(), result: Ok(std::sync::Mutex::new(storage)) }
+    }
+
+    #[test]
+    fn run_restore_opens_items_and_marks_the_workspace_restored() {
+        let (t, st) = temp_storage();
+        let w = workspaces::create(&st, "W").unwrap();
+        let file = t.path().join("a.txt");
+        std::fs::write(&file, b"").unwrap();
+        let (path, kind) = workspaces::validate_item_path(&file.to_string_lossy()).unwrap();
+        workspaces::add_item(&st, w.id, &path, &kind, None, "windows_default").unwrap();
+        let state = state_with(st, t.path());
+
+        let launcher = CountingLauncher(std::cell::Cell::new(0));
+        let run = run_restore(&state, w.id, &FsProbe, &launcher).unwrap();
+        assert!(run.report.completed);
+        assert!(run.save_error.is_none());
+        assert!(matches!(run.report.outcomes[..], [ItemOutcome::Opened { .. }]));
+        assert_eq!(launcher.0.get(), 1);
+        let got = with_storage(&state, |s| Ok(workspaces::get(s, w.id)?.unwrap())).unwrap();
+        assert!(got.last_restored_at.is_some());
+    }
+
+    #[test]
+    fn run_restore_on_an_empty_workspace_completes_with_no_outcomes() {
+        let (t, st) = temp_storage();
+        let w = workspaces::create(&st, "W").unwrap();
+        let state = state_with(st, t.path());
+        let launcher = CountingLauncher(std::cell::Cell::new(0));
+        let run = run_restore(&state, w.id, &FsProbe, &launcher).unwrap();
+        assert!(run.report.completed);
+        assert!(run.save_error.is_none());
+        assert!(run.report.outcomes.is_empty());
+        assert_eq!(launcher.0.get(), 0);
+    }
+
+    #[test]
+    fn run_restore_unknown_workspace_is_not_found() {
+        let (t, st) = temp_storage();
+        let state = state_with(st, t.path());
+        let launcher = CountingLauncher(std::cell::Cell::new(0));
+        let err = run_restore(&state, 9999, &FsProbe, &launcher).unwrap_err();
+        assert_eq!(err.code, WorkspaceCode::WorkspaceNotFound);
+    }
+
+    #[test]
+    fn run_restore_keeps_the_report_when_the_last_used_time_cannot_be_saved() {
+        let (t, st) = temp_storage();
+        let w = workspaces::create(&st, "W").unwrap();
+        let file = t.path().join("a.txt");
+        std::fs::write(&file, b"").unwrap();
+        let (path, kind) = workspaces::validate_item_path(&file.to_string_lossy()).unwrap();
+        workspaces::add_item(&st, w.id, &path, &kind, None, "windows_default").unwrap();
+        st.connection()
+            .execute_batch(
+                "CREATE TRIGGER block_restore_stamp BEFORE UPDATE ON workspaces \
+                 BEGIN SELECT RAISE(ABORT, 'read-only'); END;",
+            )
+            .unwrap();
+        let state = state_with(st, t.path());
+
+        let launcher = CountingLauncher(std::cell::Cell::new(0));
+        let run = run_restore(&state, w.id, &FsProbe, &launcher).unwrap();
+        assert!(run.report.completed);
+        assert!(matches!(run.report.outcomes[..], [ItemOutcome::Opened { .. }]));
+        assert_eq!(launcher.0.get(), 1);
+        assert_eq!(run.save_error.as_ref().map(|e| e.code), Some(WorkspaceCode::StorageUnavailable));
+
+        let wire = restore_result(Ok(run));
+        assert!(wire.completed);
+        assert_eq!(wire.outcomes.len(), 1);
+        assert_eq!(wire.error, Some(WorkspaceErrorCode::StorageUnavailable));
+        let got = with_storage(&state, |s| Ok(workspaces::get(s, w.id)?.unwrap())).unwrap();
+        assert!(got.last_restored_at.is_none());
+    }
+
+    #[test]
+    fn run_relink_updates_the_path_and_rejects_a_kind_mismatch() {
+        let (t, st) = temp_storage();
+        let w = workspaces::create(&st, "W").unwrap();
+        let old = t.path().join("old.txt");
+        let new = t.path().join("new.txt");
+        let dir = t.path().join("dir");
+        std::fs::write(&old, b"").unwrap();
+        std::fs::write(&new, b"").unwrap();
+        std::fs::create_dir(&dir).unwrap();
+        let (path, kind) = workspaces::validate_item_path(&old.to_string_lossy()).unwrap();
+        let ws = workspaces::add_item(&st, w.id, &path, &kind, None, "windows_default").unwrap();
+        let item_id = ws.items[0].id;
+        let state = state_with(st, t.path());
+
+        let err = run_relink(&state, &FsProbe, item_id, &dir.to_string_lossy()).unwrap_err();
+        assert_eq!(err.code, WorkspaceCode::ItemKindMismatch);
+        assert_eq!(err.detail.as_deref(), Some("file"));
+
+        let ws = run_relink(&state, &FsProbe, item_id, &new.to_string_lossy()).unwrap();
+        assert_eq!(ws.items[0].id, item_id);
+        assert!(ws.items[0].path.ends_with("new.txt"));
+
+        let err = run_relink(&state, &FsProbe, item_id, "relative\\x").unwrap_err();
+        assert_eq!(err.code, WorkspaceCode::ItemRelativePath);
     }
 }

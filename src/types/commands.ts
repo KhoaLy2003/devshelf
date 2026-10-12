@@ -188,11 +188,13 @@ export type WorkspaceCode =
   | "item_path_too_long"
   | "item_relative_path"
   | "item_path_not_found"
+  | "item_path_unreachable"
   | "item_duplicate"
   | "item_not_found"
   | "project_not_found"
   | "profile_not_found"
   | "move_blocked"
+  | "item_kind_mismatch"
   | "storage_unavailable";
 
 // Rust (workspaces::Item.kind) is authoritative; keep this list in sync.
@@ -213,6 +215,7 @@ export interface WorkspaceView {
   id: number;
   name: string;
   items: WorkspaceItemView[];
+  last_restored_at: string | null;
 }
 
 export interface WorkspaceSummaryView {
@@ -220,6 +223,7 @@ export interface WorkspaceSummaryView {
   name: string;
   item_count: number;
   project_names: string[];
+  last_restored_at: string | null;
 }
 
 export type WorkspacesListArgs = Record<string, never>;
@@ -286,4 +290,28 @@ export interface WorkspacePickItemArgs {
 
 export interface WorkspacePickResult {
   path: string | null;
+}
+
+export type RestoreMissingReason = "not_found" | "now_folder" | "now_file";
+
+export type RestoreOutcomeView =
+  | { kind: "opened"; item_id: number; reason: null; code: null }
+  | { kind: "missing"; item_id: number; reason: RestoreMissingReason; code: null }
+  | { kind: "unreachable"; item_id: number; reason: null; code: null }
+  | { kind: "could_not_open"; item_id: number; reason: null; code: EditorCode };
+
+export interface WorkspaceRestoreArgs {
+  id: number;
+}
+
+export interface WorkspaceRestoreResult {
+  outcomes: RestoreOutcomeView[];
+  completed: boolean;
+  error: WorkspaceCode | null;
+  detail: string | null;
+}
+
+export interface ItemRelinkArgs {
+  item_id: number;
+  path: string;
 }

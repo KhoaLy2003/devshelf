@@ -166,7 +166,7 @@ fn open_result(r: Result<Profile, EditorError>) -> EditorOpenResult {
 
 /// Launches through the real app: processes via `SystemLauncher`, the Windows default via the
 /// opener plugin.
-struct AppOpener<'a>(&'a AppHandle);
+pub(crate) struct AppOpener<'a>(pub(crate) &'a AppHandle);
 
 impl Launcher for AppOpener<'_> {
     fn spawn(&self, plan: &LaunchPlan) -> std::io::Result<()> {

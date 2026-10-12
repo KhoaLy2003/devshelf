@@ -103,3 +103,22 @@ Open gaps for the Step 6 reviewer:
 - Persistence check used a webview reload, not a full app restart (AC-20). Reopen behaviour is covered by the Rust persistence test.
 - E2E ran against `tauri dev`, not the built app (constitution P4). Still outstanding for F01–F04.
 - Test data from earlier E2E runs remains in the real database (projects App A, App A Sub, app b, App C) — intentionally kept; workspaces were all deleted.
+
+## workspace-restore
+
+| Step | Name | Agent | Status | Output |
+|---|---|---|---|---|
+| 1 | Spec | brainstorming | complete | docs/specs/workspace-restore/spec.md (approved; D1 one by one; D2 Ignore current panel only; D3 missing and unreachable separate) |
+| 2 | Plan | writing-plans | complete | docs/specs/workspace-restore/plan.md |
+| 3 | Implement | task (Rust), frontend-developer (UI) | complete | branch `feature/workspace-restore` (cut from eedf4c5); not committed |
+| 4 | Review | code-reviewer | complete | APPROVE; 3 minor fixed (relink to unreachable path, report lost when last-used save fails, profile-not-found test); TS handler fixed for partial completion; nits kept |
+| 5 | E2E | task (dev-mode run) | complete | docs/E2E-TESTS-F05.md: 26 PASS, 0 FAIL, 2 BLOCKED (R04 covered by R04b; R23 unreachable path unavailable on this machine) |
+| 6 | Manual Check | Human | pending (hard gate) | — |
+| 7 | Ship | finishing-a-development-branch | pending | — |
+
+Verification at fix close: `npx tsc --noEmit` ok; `npm run build` ok; `npm run lint` ok; `npx vitest run` 89 pass; `cargo test --lib` 119 pass; `cargo build` 0 warnings.
+
+Open gaps for the Step 6 reviewer:
+- Unreachable group never displayed in the UI E2E (no safe unreachable path). Covered by Rust tests only.
+- Dev-mode run, not the built app (constitution P4), still outstanding for F01–F05.
+- Two earlier advisories (M2 command-mapping tests; WorkspaceFormContract lint/tsc) were checked: the tests exist and tsc, build and lint pass.

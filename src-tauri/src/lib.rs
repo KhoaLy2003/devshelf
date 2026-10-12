@@ -49,7 +49,9 @@ pub fn run() {
             commands::workspaces::workspace_items_update,
             commands::workspaces::workspace_items_remove,
             commands::workspaces::workspace_items_move,
-            commands::workspaces::workspaces_pick_item
+            commands::workspaces::workspaces_pick_item,
+            commands::workspaces::workspace_restore,
+            commands::workspaces::workspace_items_relink
         ])
         .run(tauri::generate_context!())
         .expect("error while running DevShelf");

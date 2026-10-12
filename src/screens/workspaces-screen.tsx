@@ -66,6 +66,11 @@ export function WorkspacesScreen() {
                 <span className="text-sm text-ink-muted">
                   {workspace.item_count} {workspace.item_count === 1 ? "item" : "items"}
                 </span>
+                <span className="text-sm text-ink-muted">
+                  {workspace.last_restored_at === null
+                    ? "Never restored"
+                    : `Last restored ${new Date(workspace.last_restored_at).toLocaleString()}`}
+                </span>
               </Link>
             </li>
           ))}

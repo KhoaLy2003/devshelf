@@ -45,6 +45,12 @@ describe("formatWorkspaceError", () => {
     );
   });
 
+  it("item_path_unreachable inserts the detail path", () => {
+    expect(formatWorkspaceError("item_path_unreachable", "Z:\\a.txt", "Ops")).toBe(
+      "`Z:\\a.txt` can't be reached. The drive may not be ready or the network path is unavailable.",
+    );
+  });
+
   it("item_duplicate inserts the detail path", () => {
     expect(formatWorkspaceError("item_duplicate", "F:\\work\\notes.txt", "Ops")).toBe(
       "`F:\\work\\notes.txt` is already in this workspace.",
@@ -77,6 +83,15 @@ describe("formatWorkspaceError", () => {
   it("move_blocked", () => {
     expect(formatWorkspaceError("move_blocked", null, "Ops")).toBe(
       "This item is already at that end of the list.",
+    );
+  });
+
+  it("item_kind_mismatch names the kind to pick", () => {
+    expect(formatWorkspaceError("item_kind_mismatch", "file", "")).toBe(
+      "This is a folder. Pick a file.",
+    );
+    expect(formatWorkspaceError("item_kind_mismatch", "folder", "")).toBe(
+      "This is a file. Pick a folder.",
     );
   });
 
