@@ -52,6 +52,12 @@ pub fn run() {
             commands::workspaces::workspaces_pick_item,
             commands::workspaces::workspace_restore,
             commands::workspaces::workspace_items_relink,
+            commands::config::config_files_list,
+            commands::config::config_files_add,
+            commands::config::config_files_relink,
+            commands::config::config_files_remove,
+            commands::config::config_files_open,
+            commands::config::config_files_pick,
             commands::home::home_overview
         ])
         .run(tauri::generate_context!())

@@ -1,6 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AppInfo,
+  ConfigAddArgs,
+  ConfigEntryResult,
+  ConfigListArgs,
+  ConfigListResult,
+  ConfigOpenArgs,
+  ConfigOpenResult,
+  ConfigPickArgs,
+  ConfigPickResult,
+  ConfigRelinkArgs,
+  ConfigRemoveArgs,
+  ConfigRemoveResult,
   HomeOverviewArgs,
   HomeOverviewResult,
   EditorOpenArgs,
@@ -181,4 +192,33 @@ export function relinkWorkspaceItem(itemId: number, path: string): Promise<Works
 export function getHomeOverview(): Promise<HomeOverviewResult> {
   const args: HomeOverviewArgs = {};
   return invoke<HomeOverviewResult>("home_overview", { args });
+}
+
+export function listConfigFiles(): Promise<ConfigListResult> {
+  const args: ConfigListArgs = {};
+  return invoke<ConfigListResult>("config_files_list", { args });
+}
+
+export function addConfigFile(args: ConfigAddArgs): Promise<ConfigEntryResult> {
+  return invoke<ConfigEntryResult>("config_files_add", { args });
+}
+
+export function relinkConfigFile(id: number, path: string): Promise<ConfigEntryResult> {
+  const args: ConfigRelinkArgs = { id, path };
+  return invoke<ConfigEntryResult>("config_files_relink", { args });
+}
+
+export function removeConfigFile(id: number): Promise<ConfigRemoveResult> {
+  const args: ConfigRemoveArgs = { id };
+  return invoke<ConfigRemoveResult>("config_files_remove", { args });
+}
+
+export function openConfigFile(id: number, editorKind: string | null): Promise<ConfigOpenResult> {
+  const args: ConfigOpenArgs = { id, editor_kind: editorKind };
+  return invoke<ConfigOpenResult>("config_files_open", { args });
+}
+
+export function pickConfigFile(): Promise<ConfigPickResult> {
+  const args: ConfigPickArgs = {};
+  return invoke<ConfigPickResult>("config_files_pick", { args });
 }

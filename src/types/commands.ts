@@ -344,3 +344,98 @@ export interface HomeOverviewResult {
   error: HomeErrorCode | null;
   detail: string | null;
 }
+
+export type ConfigCode =
+  | "config_not_found"
+  | "path_empty"
+  | "path_not_found"
+  | "path_is_folder"
+  | "path_relative"
+  | "path_too_long"
+  | "duplicate_path"
+  | "project_not_found"
+  | "environment_invalid"
+  | "kind_invalid"
+  | "storage_unavailable";
+
+// Rust (config::ENVIRONMENTS) is authoritative; keep this list in sync.
+export const CONFIG_ENVIRONMENTS = ["local", "dev", "staging", "production"] as const;
+
+export type ConfigEnvironment = (typeof CONFIG_ENVIRONMENTS)[number];
+
+// Rust (config::KINDS) is authoritative; keep this list in sync.
+export const CONFIG_KINDS = [
+  "yaml",
+  "properties",
+  "dotenv",
+  "docker_compose",
+  "caddy_nginx",
+  "json",
+] as const;
+
+export type ConfigKind = (typeof CONFIG_KINDS)[number];
+
+export type ConfigStatus = "available" | "missing" | "folder_at_path" | "inaccessible";
+
+export interface ConfigEntryView {
+  id: number;
+  project_id: number;
+  project_name: string | null;
+  path: string;
+  name: string;
+  environment: string;
+  kind: string;
+  status: ConfigStatus;
+}
+
+export type ConfigListArgs = Record<string, never>;
+
+export interface ConfigListResult {
+  entries: ConfigEntryView[];
+  error: ConfigCode | null;
+  detail: string | null;
+}
+
+export interface ConfigAddArgs {
+  project_id: number;
+  path: string;
+  environment: string;
+  kind: string;
+}
+
+export interface ConfigEntryResult {
+  entry: ConfigEntryView | null;
+  error: ConfigCode | null;
+  detail: string | null;
+}
+
+export interface ConfigRelinkArgs {
+  id: number;
+  path: string;
+}
+
+export interface ConfigRemoveArgs {
+  id: number;
+}
+
+export interface ConfigRemoveResult {
+  error: ConfigCode | null;
+  detail: string | null;
+}
+
+export interface ConfigOpenArgs {
+  id: number;
+  editor_kind: string | null;
+}
+
+export interface ConfigOpenResult {
+  opened_name: string | null;
+  error: EditorCode | null;
+  detail: string | null;
+}
+
+export type ConfigPickArgs = Record<string, never>;
+
+export interface ConfigPickResult {
+  path: string | null;
+}

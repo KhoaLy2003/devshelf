@@ -1,6 +1,6 @@
 use rusqlite_migration::{Migrations, M};
 
-pub const MIGRATIONS_COUNT: usize = 6;
+pub const MIGRATIONS_COUNT: usize = 7;
 
 pub fn migrations() -> Migrations<'static> {
     Migrations::new(vec![
@@ -59,5 +59,17 @@ CREATE TABLE workspace_items (
         ),
         M::up("ALTER TABLE workspaces ADD COLUMN last_restored_at TEXT;"),
         M::up("ALTER TABLE workspaces ADD COLUMN last_restore_missing INTEGER NOT NULL DEFAULT 0;"),
+        M::up(
+            "CREATE TABLE config_files (
+  id INTEGER PRIMARY KEY,
+  project_id INTEGER NOT NULL,
+  path TEXT NOT NULL,
+  path_key TEXT NOT NULL,
+  environment TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  UNIQUE (project_id, path_key)
+);
+-- foreign_keys is off; project existence is checked by the command, and entries survive project removal (F15) by design.",
+        ),
     ])
 }

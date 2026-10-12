@@ -1,3 +1,4 @@
+pub mod config;
 pub mod editors;
 pub mod home;
 pub mod projects;

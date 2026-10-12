@@ -76,7 +76,7 @@ mod tests {
         let folder = tmp.path().join("a").join("b");
         let storage = open_in(&folder).unwrap();
         assert!(folder.join(DB_FILE_NAME).is_file());
-        assert_eq!(storage.schema_version(), 6);
+        assert_eq!(storage.schema_version(), 7);
     }
 
     #[test]

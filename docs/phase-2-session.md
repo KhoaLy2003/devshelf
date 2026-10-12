@@ -142,3 +142,23 @@ Open gaps for the Step 6 reviewer:
 - Date format differs between Home ("12 Oct 2026, 19:37") and the Workspaces list ("10/12/2026, 7:06:37 PM"). Not fixed; decide one format at Step 6.
 - Dev-mode run, not the built app (constitution P4), still outstanding for F01–F10.
 - The re-check cleanup used a name-based kill of node.exe, which may have ended unrelated Node processes.
+
+## config-catalog
+
+| Step | Name | Agent | Status | Output |
+|---|---|---|---|---|
+| 1 | Spec | brainstorming | complete | docs/specs/config-catalog/spec.md (approved; D1 status on each load; D2 remove from catalog; D3 kind pre-selected from file name) |
+| 2 | Plan | writing-plans | complete | docs/specs/config-catalog/plan.md |
+| 3 | Implement | task (Rust), frontend-developer (UI) | complete | branch `feature/config-catalog` (cut from fc2856a); not committed. Domain tests written with the code (no red run observed) |
+| 4 | Review | code-reviewer | complete | CHANGES REQUIRED (minor only): P2 violation (config query JOINed projects table; fixed via projects list lookup), stale Open row (fixed by invalidation), comment and scan nits fixed |
+| 5 | E2E | task (dev-mode run) | complete with 1 FAIL fixed (stale list on revisit; fixed with refetch on visit) and a stale Open message fixed; 34 PASS, 1 FAIL (fixed), 2 BLOCKED; re-check 3 of 3 PASS | docs/E2E-TESTS-F06.md |
+| 6 | Manual Check | Human | pending (hard gate) | — |
+| 7 | Ship | finishing-a-development-branch | pending | — |
+
+Verification at fix close: `npx tsc --noEmit` ok; `npm run build` ok; `npm run lint` ok; `npx vitest run` 142 pass; `cargo test --lib` 151 pass; `cargo build` 0 warnings.
+
+Open gaps for the Step 6 reviewer:
+- BLOCKED: Open with a non-default profile success message (no safe profile with a path; Notepad++, VS Code and Custom are unconfigured); Inaccessible status (no safe unreachable path).
+- Typed paths do not pre-select the kind; only the file picker does. Spec says "picked", so accepted.
+- "Choose a project." (required-field copy in the add dialog) is UI copy not in the spec's copy list. Decide at Step 6.
+- Dev-mode run, not the built app (constitution P4), still outstanding for F01–F06.
