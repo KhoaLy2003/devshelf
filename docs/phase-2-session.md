@@ -184,3 +184,24 @@ Open gaps for the Step 6 reviewer:
 - E2E removed one test note with a direct SQL DELETE on the live DB, and created then deleted the Credential Manager entry. Both are disclosed in the report.
 - Dev-mode run, not the built app (constitution P4), still outstanding for F01–F07.
 - Not exercised: a real restart with notes present, blank-title list label, AC-24 queuing.
+
+## vault-access-control
+
+| Step | Name | Agent | Status | Output |
+|---|---|---|---|---|
+| 1 | Spec | brainstorming | complete, approved | docs/specs/vault-access-control/spec.md (12-char minimum; auto-lock 1/5/15 min and Never, default 5; inactivity = pointer or keyboard input in the window; 60 s countdown in chrome; no lockout; notes independent; no password change) |
+| 2 | Plan | writing-plans | complete | docs/specs/vault-access-control/plan.md (Argon2id 0.6.0; verifier = AEAD ciphertext of a fixed constant; migration 9 vault_meta) |
+| 3 | Implement | task (Rust), frontend-developer (UI) | complete | branch feature/vault-access-control; Rust 249 tests, 1 ignored (timing bench); Argon2 production unlock 371 ms (debug build) |
+| 4 | Review | self-verified | fixes applied | Spec contradiction on whitespace passwords resolved in the spec; lint fix for empty interfaces |
+| 5 | E2E | task (dev-mode run) | complete | docs/E2E-TESTS-F08.md: 19 PASS, 4 FAIL (all four fixed), 1 BLOCKED; re-check 6/6 PASS |
+| 6 | Manual Check | Human | approved | — |
+| 7 | Ship | — | done | local commit; roadmap F08 shipped |
+
+Verification at ship: tsc ok, lint 0, build ok, vitest 188 pass, cargo lib 249 pass, cargo build zero warnings.
+
+Gaps recorded for later:
+- Tampered-verifier test not run against the live app (app cannot be pointed at another data folder). Covered by Rust tests (AC-25).
+- The live data folder now holds a vault with the test password E2E-Vault-Pass-2026, from the E2E run. Change or recreate it before real use (no password change feature exists, per the spec).
+- Password arrives as a plain IPC string; it is zeroized on the Rust side only after use, so IPC copies are not scrubbed (limitation).
+- Manual-lock copy is "You locked the vault." per spec; the launch reason copy ("Locked because DevShelf just started.") is not in the spec and was chosen by the UI slice.
+- Built-app smoke (P4) still outstanding for F01–F08.

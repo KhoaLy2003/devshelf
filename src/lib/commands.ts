@@ -67,6 +67,13 @@ import type {
   NoteSaveResult,
   NotesListArgs,
   NotesListResult,
+  VaultLockArgs,
+  VaultSetAutoLockArgs,
+  VaultSetupArgs,
+  VaultStatusArgs,
+  VaultStatusResult,
+  VaultTouchArgs,
+  VaultUnlockArgs,
 } from "../types/commands";
 
 export function appInfo(): Promise<AppInfo> {
@@ -254,4 +261,33 @@ export function saveNote(args: NoteSaveArgs): Promise<NoteSaveResult> {
 export function deleteNote(id: number): Promise<NoteDeleteResult> {
   const args: NoteDeleteArgs = { id };
   return invoke<NoteDeleteResult>("notes_delete", { args });
+}
+
+export function vaultStatus(): Promise<VaultStatusResult> {
+  const args: VaultStatusArgs = {};
+  return invoke<VaultStatusResult>("vault_status", { args });
+}
+
+export function vaultSetup(args: VaultSetupArgs): Promise<VaultStatusResult> {
+  return invoke<VaultStatusResult>("vault_setup", { args });
+}
+
+export function vaultUnlock(password: string): Promise<VaultStatusResult> {
+  const args: VaultUnlockArgs = { password };
+  return invoke<VaultStatusResult>("vault_unlock", { args });
+}
+
+export function vaultLock(): Promise<VaultStatusResult> {
+  const args: VaultLockArgs = {};
+  return invoke<VaultStatusResult>("vault_lock", { args });
+}
+
+export function vaultTouch(): Promise<VaultStatusResult> {
+  const args: VaultTouchArgs = {};
+  return invoke<VaultStatusResult>("vault_touch", { args });
+}
+
+export function vaultSetAutoLock(minutes: number): Promise<VaultStatusResult> {
+  const args: VaultSetAutoLockArgs = { minutes };
+  return invoke<VaultStatusResult>("vault_set_auto_lock", { args });
 }

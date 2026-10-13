@@ -514,3 +514,54 @@ export interface NoteDeleteResult {
   error: NoteCode | null;
   detail: string | null;
 }
+
+// F08 vault access control. Contract shared by Rust (commands/vault.rs) and UI.
+
+export type VaultState = "not_set_up" | "locked" | "unlocked";
+
+export type VaultLockReason = "launch" | "manual" | "inactivity";
+
+export type VaultAutoLockMinutes = 0 | 1 | 5 | 15;
+
+export type VaultCode =
+  | "vault_password_required"
+  | "vault_password_mismatch"
+  | "vault_password_too_short"
+  | "vault_wrong_password"
+  | "vault_not_set_up"
+  | "vault_already_set_up"
+  | "vault_invalid_timeout"
+  | "vault_storage_unavailable";
+
+export interface VaultStatusView {
+  state: VaultState;
+  lock_reason: VaultLockReason | null;
+  auto_lock_minutes: VaultAutoLockMinutes;
+  seconds_until_lock: number | null;
+}
+
+export type VaultStatusArgs = Record<string, never>;
+
+export interface VaultStatusResult {
+  status: VaultStatusView | null;
+  error: VaultCode | null;
+  detail: string | null;
+}
+
+export interface VaultSetupArgs {
+  password: string;
+  confirmation: string;
+  acknowledged: boolean;
+}
+
+export interface VaultUnlockArgs {
+  password: string;
+}
+
+export type VaultLockArgs = Record<string, never>;
+
+export type VaultTouchArgs = Record<string, never>;
+
+export interface VaultSetAutoLockArgs {
+  minutes: number;
+}

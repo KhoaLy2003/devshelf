@@ -1,6 +1,6 @@
 use rusqlite_migration::{Migrations, M};
 
-pub const MIGRATIONS_COUNT: usize = 8;
+pub const MIGRATIONS_COUNT: usize = 9;
 
 pub fn migrations() -> Migrations<'static> {
     Migrations::new(vec![
@@ -81,6 +81,19 @@ CREATE TABLE workspace_items (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 -- project_id is validated by the notes module (projects::get); no foreign key enforcement.",
+        ),
+        M::up(
+            "CREATE TABLE vault_meta (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  salt BLOB NOT NULL,
+  m_cost INTEGER NOT NULL,
+  t_cost INTEGER NOT NULL,
+  p_cost INTEGER NOT NULL,
+  verifier BLOB NOT NULL,
+  auto_lock_minutes INTEGER NOT NULL DEFAULT 5 CHECK (auto_lock_minutes IN (0,1,5,15)),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+-- Single row. Holds salt, cost parameters and the sealed verifier only; never a password or key.",
         ),
     ])
 }

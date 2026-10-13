@@ -26,6 +26,13 @@ pub fn run() {
             app.manage(commands::notes::NoteKeys(Box::new(
                 notes::CredentialKeyStore,
             )));
+            app.manage(vault::VaultSession::new());
+            // Locks an idle vault without depending on UI calls; same rule as the lazy check.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                handle.state::<vault::VaultSession>().expire_if_due();
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -66,7 +73,13 @@ pub fn run() {
             commands::notes::notes_get,
             commands::notes::notes_create,
             commands::notes::notes_save,
-            commands::notes::notes_delete
+            commands::notes::notes_delete,
+            commands::vault::vault_status,
+            commands::vault::vault_setup,
+            commands::vault::vault_unlock,
+            commands::vault::vault_lock,
+            commands::vault::vault_touch,
+            commands::vault::vault_set_auto_lock
         ])
         .run(tauri::generate_context!())
         .expect("error while running DevShelf");

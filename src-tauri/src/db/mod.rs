@@ -76,7 +76,7 @@ mod tests {
         let folder = tmp.path().join("a").join("b");
         let storage = open_in(&folder).unwrap();
         assert!(folder.join(DB_FILE_NAME).is_file());
-        assert_eq!(storage.schema_version(), 8);
+        assert_eq!(storage.schema_version(), 9);
     }
 
     #[test]
@@ -113,7 +113,7 @@ mod tests {
                 .unwrap();
         }
         let second = open_in(tmp.path()).unwrap();
-        assert_eq!(second.schema_version(), 8);
+        assert_eq!(second.schema_version(), 9);
         let (title, body, created, updated): (String, Vec<u8>, String, String) = second
             .conn
             .query_row(
@@ -126,6 +126,34 @@ mod tests {
         assert_eq!(body, vec![0x0A, 0x0B]);
         assert_eq!(created.len(), 20);
         assert_eq!(updated.len(), 20);
+    }
+
+    #[test]
+    fn migration_9_creates_single_row_vault_meta_with_checks() {
+        let tmp = tempfile::tempdir().unwrap();
+        let storage = open_in(tmp.path()).unwrap();
+        let insert = |id: i64, minutes: Option<i64>| match minutes {
+            Some(m) => storage.conn.execute(
+                "INSERT INTO vault_meta (id, salt, m_cost, t_cost, p_cost, verifier, auto_lock_minutes) VALUES (?1, X'00', 8, 1, 1, X'00', ?2)",
+                rusqlite::params![id, m],
+            ),
+            None => storage.conn.execute(
+                "INSERT INTO vault_meta (id, salt, m_cost, t_cost, p_cost, verifier) VALUES (?1, X'00', 8, 1, 1, X'00')",
+                rusqlite::params![id],
+            ),
+        };
+        assert!(insert(2, None).is_err(), "id must be 1");
+        assert!(insert(1, Some(7)).is_err(), "timeout must be 0, 1, 5 or 15");
+        insert(1, None).unwrap();
+        assert!(insert(1, None).is_err(), "only one row");
+        let (minutes, created): (i64, String) = storage
+            .conn
+            .query_row("SELECT auto_lock_minutes, created_at FROM vault_meta", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(minutes, 5);
+        assert_eq!(created.len(), 20);
     }
 
     #[test]

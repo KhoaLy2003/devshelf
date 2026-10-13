@@ -4,6 +4,7 @@ pub mod home;
 pub mod notes;
 pub mod projects;
 pub mod storage;
+pub mod vault;
 pub mod workspaces;
 
 use serde::{Deserialize, Serialize};
