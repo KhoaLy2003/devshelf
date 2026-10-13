@@ -1,6 +1,7 @@
 pub mod config;
 pub mod editors;
 pub mod home;
+pub mod notes;
 pub mod projects;
 pub mod storage;
 pub mod workspaces;

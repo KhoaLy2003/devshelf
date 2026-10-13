@@ -76,7 +76,7 @@ mod tests {
         let folder = tmp.path().join("a").join("b");
         let storage = open_in(&folder).unwrap();
         assert!(folder.join(DB_FILE_NAME).is_file());
-        assert_eq!(storage.schema_version(), 7);
+        assert_eq!(storage.schema_version(), 8);
     }
 
     #[test]
@@ -97,6 +97,35 @@ mod tests {
             .query_row("SELECT value FROM app_meta WHERE key = 'marker'", [], |r| r.get(0))
             .unwrap();
         assert_eq!(value, "kept");
+    }
+
+    #[test]
+    fn migration_8_creates_notes_table_and_reopen_keeps_rows() {
+        let tmp = tempfile::tempdir().unwrap();
+        {
+            let first = open_in(tmp.path()).unwrap();
+            first
+                .conn
+                .execute(
+                    "INSERT INTO notes (project_id, title, body_enc) VALUES (NULL, 'kept', X'0A0B')",
+                    [],
+                )
+                .unwrap();
+        }
+        let second = open_in(tmp.path()).unwrap();
+        assert_eq!(second.schema_version(), 8);
+        let (title, body, created, updated): (String, Vec<u8>, String, String) = second
+            .conn
+            .query_row(
+                "SELECT title, body_enc, created_at, updated_at FROM notes",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(title, "kept");
+        assert_eq!(body, vec![0x0A, 0x0B]);
+        assert_eq!(created.len(), 20);
+        assert_eq!(updated.len(), 20);
     }
 
     #[test]

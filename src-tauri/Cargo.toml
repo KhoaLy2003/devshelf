@@ -19,6 +19,10 @@ rusqlite_migration = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+keyring = "4"
+chacha20poly1305 = { version = "0.11", features = ["zeroize"] }
+zeroize = "1"
+getrandom = "0.3"
 
 [dev-dependencies]
 tempfile = "3"

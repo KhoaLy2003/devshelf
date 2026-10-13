@@ -1,6 +1,6 @@
 use rusqlite_migration::{Migrations, M};
 
-pub const MIGRATIONS_COUNT: usize = 7;
+pub const MIGRATIONS_COUNT: usize = 8;
 
 pub fn migrations() -> Migrations<'static> {
     Migrations::new(vec![
@@ -70,6 +70,17 @@ CREATE TABLE workspace_items (
   UNIQUE (project_id, path_key)
 );
 -- foreign_keys is off; project existence is checked by the command, and entries survive project removal (F15) by design.",
+        ),
+        M::up(
+            "CREATE TABLE notes (
+  id INTEGER PRIMARY KEY,
+  project_id INTEGER,
+  title TEXT NOT NULL,
+  body_enc BLOB NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+-- project_id is validated by the notes module (projects::get); no foreign key enforcement.",
         ),
     ])
 }

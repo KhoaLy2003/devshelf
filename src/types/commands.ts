@@ -439,3 +439,78 @@ export type ConfigPickArgs = Record<string, never>;
 export interface ConfigPickResult {
   path: string | null;
 }
+
+export type NoteCode =
+  | "note_not_found"
+  | "title_too_long"
+  | "body_too_large"
+  | "project_not_found"
+  | "key_missing"
+  | "keyring_unavailable"
+  | "body_unreadable"
+  | "storage_unavailable";
+
+// Rust (notes::MAX_TITLE_CHARS, notes::MAX_BODY_BYTES) is authoritative; keep these in sync.
+export const NOTE_TITLE_MAX = 200;
+export const NOTE_BODY_MAX_BYTES = 1_000_000;
+
+export interface NoteSummaryView {
+  id: number;
+  title: string;
+  project_id: number | null;
+  project_name: string | null;
+  updated_at: string;
+}
+
+export interface NoteView {
+  id: number;
+  title: string;
+  project_id: number | null;
+  project_name: string | null;
+  updated_at: string;
+  body: string;
+}
+
+export type NotesListArgs = Record<string, never>;
+
+export interface NotesListResult {
+  notes: NoteSummaryView[];
+  error: NoteCode | null;
+  detail: string | null;
+}
+
+export interface NoteGetArgs {
+  id: number;
+}
+
+export interface NoteResult {
+  note: NoteView | null;
+  error: NoteCode | null;
+  detail: string | null;
+}
+
+export interface NoteCreateArgs {
+  project_id: number | null;
+}
+
+export interface NoteSaveArgs {
+  id: number;
+  title: string;
+  project_id: number | null;
+  body: string;
+}
+
+export interface NoteSaveResult {
+  summary: NoteSummaryView | null;
+  error: NoteCode | null;
+  detail: string | null;
+}
+
+export interface NoteDeleteArgs {
+  id: number;
+}
+
+export interface NoteDeleteResult {
+  error: NoteCode | null;
+  detail: string | null;
+}

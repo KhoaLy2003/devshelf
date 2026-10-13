@@ -58,6 +58,15 @@ import type {
   WorkspaceRestoreResult,
   WorkspacesListArgs,
   WorkspacesListResult,
+  NoteCreateArgs,
+  NoteDeleteArgs,
+  NoteDeleteResult,
+  NoteGetArgs,
+  NoteResult,
+  NoteSaveArgs,
+  NoteSaveResult,
+  NotesListArgs,
+  NotesListResult,
 } from "../types/commands";
 
 export function appInfo(): Promise<AppInfo> {
@@ -221,4 +230,28 @@ export function openConfigFile(id: number, editorKind: string | null): Promise<C
 export function pickConfigFile(): Promise<ConfigPickResult> {
   const args: ConfigPickArgs = {};
   return invoke<ConfigPickResult>("config_files_pick", { args });
+}
+
+export function listNotes(): Promise<NotesListResult> {
+  const args: NotesListArgs = {};
+  return invoke<NotesListResult>("notes_list", { args });
+}
+
+export function getNote(id: number): Promise<NoteResult> {
+  const args: NoteGetArgs = { id };
+  return invoke<NoteResult>("notes_get", { args });
+}
+
+export function createNote(projectId: number | null): Promise<NoteResult> {
+  const args: NoteCreateArgs = { project_id: projectId };
+  return invoke<NoteResult>("notes_create", { args });
+}
+
+export function saveNote(args: NoteSaveArgs): Promise<NoteSaveResult> {
+  return invoke<NoteSaveResult>("notes_save", { args });
+}
+
+export function deleteNote(id: number): Promise<NoteDeleteResult> {
+  const args: NoteDeleteArgs = { id };
+  return invoke<NoteDeleteResult>("notes_delete", { args });
 }

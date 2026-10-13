@@ -23,6 +23,9 @@ pub fn run() {
         .setup(|app| {
             let folder = app.path().app_data_dir().unwrap_or_default();
             app.manage(commands::storage::StorageState::open(folder));
+            app.manage(commands::notes::NoteKeys(Box::new(
+                notes::CredentialKeyStore,
+            )));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -58,7 +61,12 @@ pub fn run() {
             commands::config::config_files_remove,
             commands::config::config_files_open,
             commands::config::config_files_pick,
-            commands::home::home_overview
+            commands::home::home_overview,
+            commands::notes::notes_list,
+            commands::notes::notes_get,
+            commands::notes::notes_create,
+            commands::notes::notes_save,
+            commands::notes::notes_delete
         ])
         .run(tauri::generate_context!())
         .expect("error while running DevShelf");

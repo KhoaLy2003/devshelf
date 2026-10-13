@@ -2,6 +2,7 @@ import { Navigate, type RouteObject } from "react-router";
 import { AppShell } from "./components/app-shell";
 import { ConfigScreen } from "./screens/config-screen";
 import { HomeScreen } from "./screens/home-screen";
+import { NoteEditorScreen } from "./screens/note-editor-screen";
 import { NotesScreen } from "./screens/notes-screen";
 import { NotFoundScreen } from "./screens/not-found-screen";
 import { ProjectDetailScreen } from "./screens/project-detail-screen";
@@ -26,6 +27,7 @@ export const routes: RouteObject[] = [
       { id: "config", path: "config", element: <ConfigScreen /> },
       { id: "vault", path: "vault", element: <VaultScreen /> },
       { id: "notes", path: "notes", element: <NotesScreen /> },
+      { id: "note-editor", path: "notes/:id", element: <NoteEditorScreen /> },
       { id: "settings", path: "settings", element: <SettingsScreen /> },
       { id: "not-found", path: "*", element: <NotFoundScreen /> },
     ],

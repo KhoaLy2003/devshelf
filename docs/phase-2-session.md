@@ -162,3 +162,25 @@ Open gaps for the Step 6 reviewer:
 - Typed paths do not pre-select the kind; only the file picker does. Spec says "picked", so accepted.
 - "Choose a project." (required-field copy in the add dialog) is UI copy not in the spec's copy list. Decide at Step 6.
 - Dev-mode run, not the built app (constitution P4), still outstanding for F01–F06.
+
+## project-notes
+
+| Step | Name | Agent | Status | Output |
+|---|---|---|---|---|
+| 1 | Spec | brainstorming | complete | docs/specs/project-notes/spec.md (approved; D1 titles plaintext; D2 accept key loss until F12; D3 1-second autosave; D4 preview deferred; D5 immediate create) |
+| 2 | Plan | writing-plans | complete | docs/specs/project-notes/plan.md |
+| 3 | Implement | task (Rust), frontend-developer (UI) | complete | branch `feature/project-notes` (cut from d9e97e4); not committed. Crates: keyring 4.2.0 (default features), chacha20poly1305 0.11.0 (zeroize feature), zeroize 1.9.1, getrandom 0.3 |
+| 4 | Review | code-reviewer | complete | CHANGES REQUIRED: 2 major (navigation loses unsaved text, fixed with useBlocker; key load under storage lock, fixed with load_key before lock), 1 minor (encrypt panics, fixed to Result), nits (dead constant, redundant zeroize, sidebar-visible No project label) |
+| 5 | E2E | task (dev-mode run) | complete | docs/E2E-TESTS-F07.md: 14 PASS, 0 FAIL, 1 BLOCKED (failing save path, covered by Rust tests only) |
+| 6 | Manual Check | Human | pending (hard gate) | — |
+| 7 | Ship | finishing-a-development-branch | pending | — |
+
+Verification: tsc ok; lint ok; vitest 175 pass; cargo test --lib 206 pass; zero warnings.
+
+Open gaps for the Step 6 reviewer:
+- Note with a missing key shows no Delete control, so such a note cannot be removed from the UI. Not required by AC-32; decide whether to add delete there.
+- Failing-save UI (AC-22, AC-23 failure branch) not seen live; only Rust paths tested.
+- Window close is not guarded: unsaved text (up to about 1.25 s of typing) can be lost on close or reload.
+- E2E removed one test note with a direct SQL DELETE on the live DB, and created then deleted the Credential Manager entry. Both are disclosed in the report.
+- Dev-mode run, not the built app (constitution P4), still outstanding for F01–F07.
+- Not exercised: a real restart with notes present, blank-title list label, AC-24 queuing.
