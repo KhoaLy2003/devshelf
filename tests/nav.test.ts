@@ -9,6 +9,7 @@ describe("NAV_ITEMS", () => {
       ["Workspaces", "/workspaces"],
       ["Config Catalog", "/config"],
       ["Vault", "/vault"],
+      ["Secrets", "/secrets"],
       ["Notes", "/notes"],
       ["Settings", "/settings"],
     ]);

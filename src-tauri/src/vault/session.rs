@@ -148,7 +148,7 @@ impl VaultSession {
     }
 
     /// A copy of the vault key for a protected operation (F09). Checks expiry first.
-    #[allow(dead_code)] // first consumer is F09 secret storage
+    /// Used by `vault::with_key`, the only way other modules reach the key.
     pub fn key(&self) -> Result<Zeroizing<[u8; KEY_LEN]>, NotUnlocked> {
         let now = (self.clock)();
         let mut g = self.guard();

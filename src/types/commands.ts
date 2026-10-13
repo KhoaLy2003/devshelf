@@ -565,3 +565,88 @@ export type VaultTouchArgs = Record<string, never>;
 export interface VaultSetAutoLockArgs {
   minutes: number;
 }
+
+// F09 secret entries. Contract shared by Rust (commands/secrets.rs) and UI.
+
+export type SecretType = "api_key" | "password" | "token" | "connection_string" | "other";
+
+export type SecretEnvironment = "local" | "dev" | "staging" | "production";
+
+export type SecretCode =
+  | "secrets_label_required"
+  | "secrets_value_required"
+  | "secrets_type_required"
+  | "secrets_environment_required"
+  | "secrets_label_too_long"
+  | "secrets_value_too_long"
+  | "secrets_duplicate_label"
+  | "secrets_not_found"
+  | "secrets_unreadable"
+  | "secrets_locked"
+  | "secrets_storage_unavailable"
+  | "secrets_clipboard_unavailable";
+
+export interface SecretSummaryView {
+  id: number;
+  label: string;
+  secret_type: SecretType;
+  project_id: number | null;
+  project_missing: boolean;
+  environment: SecretEnvironment;
+  updated_at: string;
+}
+
+export interface SecretListArgs {
+  project_id: number | null;
+  filter_by_project: boolean;
+  secret_type: SecretType | null;
+}
+
+export interface SecretListResult {
+  items: SecretSummaryView[];
+  error: SecretCode | null;
+  detail: string | null;
+}
+
+export interface SecretCreateArgs {
+  label: string;
+  secret_type: SecretType;
+  project_id: number | null;
+  environment: SecretEnvironment;
+  value: string;
+}
+
+export interface SecretUpdateArgs {
+  id: number;
+  label: string;
+  secret_type: SecretType;
+  project_id: number | null;
+  environment: SecretEnvironment;
+  value: string | null;
+}
+
+export interface SecretResult {
+  summary: SecretSummaryView | null;
+  error: SecretCode | null;
+  detail: string | null;
+}
+
+export interface SecretIdArgs {
+  id: number;
+}
+
+export interface SecretRevealResult {
+  value: string | null;
+  error: SecretCode | null;
+  detail: string | null;
+}
+
+export interface SecretCopyResult {
+  error: SecretCode | null;
+  detail: string | null;
+}
+
+export interface SecretDeleteResult {
+  error: SecretCode | null;
+  detail: string | null;
+}

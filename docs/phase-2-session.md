@@ -205,3 +205,25 @@ Gaps recorded for later:
 - Password arrives as a plain IPC string; it is zeroized on the Rust side only after use, so IPC copies are not scrubbed (limitation).
 - Manual-lock copy is "You locked the vault." per spec; the launch reason copy ("Locked because DevShelf just started.") is not in the spec and was chosen by the UI slice.
 - Built-app smoke (P4) still outstanding for F01–F08.
+
+## secret-entries
+
+| Step | Name | Agent | Status | Output |
+|---|---|---|---|---|
+| 1 | Spec | brainstorming | complete, approved | docs/specs/secret-entries/spec.md (types API key, Password, Token, Connection string, Other; 4096-byte maximum; 30 s reveal re-mask; project removal keeps secrets) |
+| 2 | Plan | writing-plans | complete | docs/specs/secret-entries/plan.md (migration 10; per-project case-insensitive unique index; AAD = row id) |
+| 3 | Implement | task (Rust), frontend-developer (UI) | complete | branch feature/secret-entries; Rust 274 tests; UI 202 Vitest in total |
+| 4 | Review | self-verified | complete | UI-to-Rust project_id contract checked (Rust accepts unknown project ids and flags project_missing); no open defects |
+| 5 | E2E | task (dev-mode run) | complete | docs/E2E-TESTS-F09.md: 20 PASS, 0 FAIL, 1 BLOCKED (AC-24 covered by Rust tests) |
+| 6 | Manual Check | Human | approved | — |
+| 7 | Ship | — | done | local commit; roadmap F09 shipped |
+
+Verification at ship: tsc ok, lint 0, build ok, vitest 202 pass, cargo lib 274 pass, cargo build zero warnings.
+
+Gaps recorded for later:
+- The secrets crypto module (`secrets/crypto.rs`) duplicates `notes/crypto.rs` (same XChaCha20-Poly1305 construction). Candidate cleanup: share one module.
+- An unidentified 404 resource load appears once per dev launch; URL not identified (likely a favicon or asset request; not investigated).
+- The E2E copy test did not capture or restore the user's original clipboard contents.
+- Direct DB writes in the E2E: one `project_id` set to 99999 then reverted to NULL on a test secret (disclosed in the report).
+- Reveal values pass through IPC as strings (same limitation as F08).
+- Built-app smoke (P4) still outstanding for F01–F09.

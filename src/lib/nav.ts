@@ -4,6 +4,7 @@ export const NAV_ITEMS = [
   { path: "/workspaces", label: "Workspaces" },
   { path: "/config", label: "Config Catalog" },
   { path: "/vault", label: "Vault" },
+  { path: "/secrets", label: "Secrets" },
   { path: "/notes", label: "Notes" },
   { path: "/settings", label: "Settings" },
 ] as const;

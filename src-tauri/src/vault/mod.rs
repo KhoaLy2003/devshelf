@@ -15,7 +15,17 @@ use zeroize::Zeroizing;
 use crate::db::Storage;
 
 use kdf::KdfParams;
-pub use session::{LockReason, VaultSession, DEFAULT_AUTO_LOCK_MINUTES};
+pub use session::{LockReason, NotUnlocked, VaultSession, DEFAULT_AUTO_LOCK_MINUTES};
+
+/// Runs `f` with the unlocked vault key. `Err(NotUnlocked)` when locked, expired or not set up.
+/// The key copy is zeroized when `f` returns; `f` must not retain it.
+pub fn with_key<T>(
+    session: &VaultSession,
+    f: impl FnOnce(&[u8; kdf::KEY_LEN]) -> T,
+) -> Result<T, NotUnlocked> {
+    let key = session.key()?;
+    Ok(f(&key))
+}
 
 pub const MIN_PASSWORD_CHARS: usize = 12;
 const ALLOWED_TIMEOUTS: [u8; 4] = [0, 1, 5, 15];

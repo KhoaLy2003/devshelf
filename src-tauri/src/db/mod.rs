@@ -76,7 +76,7 @@ mod tests {
         let folder = tmp.path().join("a").join("b");
         let storage = open_in(&folder).unwrap();
         assert!(folder.join(DB_FILE_NAME).is_file());
-        assert_eq!(storage.schema_version(), 9);
+        assert_eq!(storage.schema_version(), 10);
     }
 
     #[test]
@@ -113,7 +113,7 @@ mod tests {
                 .unwrap();
         }
         let second = open_in(tmp.path()).unwrap();
-        assert_eq!(second.schema_version(), 9);
+        assert_eq!(second.schema_version(), 10);
         let (title, body, created, updated): (String, Vec<u8>, String, String) = second
             .conn
             .query_row(

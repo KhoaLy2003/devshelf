@@ -1,6 +1,6 @@
 use rusqlite_migration::{Migrations, M};
 
-pub const MIGRATIONS_COUNT: usize = 9;
+pub const MIGRATIONS_COUNT: usize = 10;
 
 pub fn migrations() -> Migrations<'static> {
     Migrations::new(vec![
@@ -94,6 +94,21 @@ CREATE TABLE workspace_items (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
 -- Single row. Holds salt, cost parameters and the sealed verifier only; never a password or key.",
+        ),
+        M::up(
+            "CREATE TABLE secrets (
+  id INTEGER PRIMARY KEY,
+  label TEXT NOT NULL,
+  secret_type TEXT NOT NULL CHECK (secret_type IN ('api_key','password','token','connection_string','other')),
+  project_id INTEGER,
+  environment TEXT NOT NULL CHECK (environment IN ('local','dev','staging','production')),
+  body_enc BLOB NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+CREATE UNIQUE INDEX secrets_label_per_project ON secrets(COALESCE(project_id, -1), label COLLATE NOCASE);
+-- project_id has no foreign key so a removed project keeps its secrets (shown as removed).
+-- body_enc is nonce || XChaCha20-Poly1305 ciphertext under the vault key; never plaintext.",
         ),
     ])
 }

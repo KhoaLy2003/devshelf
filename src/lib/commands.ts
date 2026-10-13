@@ -67,6 +67,15 @@ import type {
   NoteSaveResult,
   NotesListArgs,
   NotesListResult,
+  SecretCreateArgs,
+  SecretDeleteResult,
+  SecretIdArgs,
+  SecretListArgs,
+  SecretListResult,
+  SecretResult,
+  SecretRevealResult,
+  SecretCopyResult,
+  SecretUpdateArgs,
   VaultLockArgs,
   VaultSetAutoLockArgs,
   VaultSetupArgs,
@@ -290,4 +299,31 @@ export function vaultTouch(): Promise<VaultStatusResult> {
 export function vaultSetAutoLock(minutes: number): Promise<VaultStatusResult> {
   const args: VaultSetAutoLockArgs = { minutes };
   return invoke<VaultStatusResult>("vault_set_auto_lock", { args });
+}
+
+export function secretsList(args: SecretListArgs): Promise<SecretListResult> {
+  return invoke<SecretListResult>("secrets_list", { args });
+}
+
+export function secretsCreate(args: SecretCreateArgs): Promise<SecretResult> {
+  return invoke<SecretResult>("secrets_create", { args });
+}
+
+export function secretsUpdate(args: SecretUpdateArgs): Promise<SecretResult> {
+  return invoke<SecretResult>("secrets_update", { args });
+}
+
+export function secretsReveal(id: number): Promise<SecretRevealResult> {
+  const args: SecretIdArgs = { id };
+  return invoke<SecretRevealResult>("secrets_reveal", { args });
+}
+
+export function secretsCopy(id: number): Promise<SecretCopyResult> {
+  const args: SecretIdArgs = { id };
+  return invoke<SecretCopyResult>("secrets_copy", { args });
+}
+
+export function secretsDelete(id: number): Promise<SecretDeleteResult> {
+  const args: SecretIdArgs = { id };
+  return invoke<SecretDeleteResult>("secrets_delete", { args });
 }

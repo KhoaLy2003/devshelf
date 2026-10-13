@@ -7,6 +7,8 @@ import { NotesScreen } from "./screens/notes-screen";
 import { NotFoundScreen } from "./screens/not-found-screen";
 import { ProjectDetailScreen } from "./screens/project-detail-screen";
 import { ProjectsScreen } from "./screens/projects-screen";
+import { SecretEditorScreen } from "./screens/secret-editor-screen";
+import { SecretsScreen } from "./screens/secrets-screen";
 import { SettingsScreen } from "./screens/settings-screen";
 import { VaultScreen } from "./screens/vault-screen";
 import { WorkspacesScreen } from "./screens/workspaces-screen";
@@ -28,6 +30,9 @@ export const routes: RouteObject[] = [
       { id: "vault", path: "vault", element: <VaultScreen /> },
       { id: "notes", path: "notes", element: <NotesScreen /> },
       { id: "note-editor", path: "notes/:id", element: <NoteEditorScreen /> },
+      { id: "secrets", path: "secrets", element: <SecretsScreen /> },
+      { id: "secret-new", path: "secrets/new", element: <SecretEditorScreen /> },
+      { id: "secret-editor", path: "secrets/:id", element: <SecretEditorScreen /> },
       { id: "settings", path: "settings", element: <SettingsScreen /> },
       { id: "not-found", path: "*", element: <NotFoundScreen /> },
     ],

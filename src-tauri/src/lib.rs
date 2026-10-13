@@ -6,6 +6,7 @@ mod db;
 mod editors;
 mod notes;
 mod projects;
+mod secrets;
 mod vault;
 mod workspaces;
 
@@ -27,6 +28,9 @@ pub fn run() {
                 notes::CredentialKeyStore,
             )));
             app.manage(vault::VaultSession::new());
+            app.manage(commands::secrets::SecretClipboard(Box::new(
+                secrets::SystemClipboard,
+            )));
             // Locks an idle vault without depending on UI calls; same rule as the lazy check.
             let handle = app.handle().clone();
             std::thread::spawn(move || loop {
@@ -79,7 +83,13 @@ pub fn run() {
             commands::vault::vault_unlock,
             commands::vault::vault_lock,
             commands::vault::vault_touch,
-            commands::vault::vault_set_auto_lock
+            commands::vault::vault_set_auto_lock,
+            commands::secrets::secrets_list,
+            commands::secrets::secrets_create,
+            commands::secrets::secrets_update,
+            commands::secrets::secrets_reveal,
+            commands::secrets::secrets_copy,
+            commands::secrets::secrets_delete
         ])
         .run(tauri::generate_context!())
         .expect("error while running DevShelf");
