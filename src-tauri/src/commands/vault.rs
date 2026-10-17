@@ -219,6 +219,93 @@ pub fn vault_set_auto_lock(
     run(&state, |s| vault::set_auto_lock(s, &session, args.minutes))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct VaultDeletePreviewArgs {}
+
+#[derive(Debug, Serialize)]
+pub struct VaultDeletePreviewResult {
+    pub secret_count: i64,
+    pub error: Option<VaultErrorCode>,
+    pub detail: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct VaultDeleteArgs {
+    pub password: String,
+}
+
+impl std::fmt::Debug for VaultDeleteArgs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VaultDeleteArgs")
+            .field("password", &format_args!("<redacted>"))
+            .finish()
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct VaultDeleteResult {
+    pub deleted_secrets: i64,
+    pub error: Option<VaultErrorCode>,
+    pub detail: Option<String>,
+}
+
+fn count_result(r: Result<i64, VaultError>) -> (i64, Option<VaultErrorCode>) {
+    match r {
+        Ok(n) => (n, None),
+        Err(e) => (0, Some(e.code.into())),
+    }
+}
+
+fn with_vault_storage(
+    state: &StorageState,
+    f: impl FnOnce(&std::sync::Mutex<crate::db::Storage>) -> Result<i64, VaultError>,
+) -> Result<i64, VaultError> {
+    match state.result.as_ref() {
+        Ok(storage) => f(storage),
+        Err(_) => Err(VaultError {
+            code: VaultCode::StorageUnavailable,
+        }),
+    }
+}
+
+fn delete_preview_result(r: Result<i64, VaultError>) -> VaultDeletePreviewResult {
+    let (secret_count, error) = count_result(r);
+    VaultDeletePreviewResult {
+        secret_count,
+        error,
+        detail: None,
+    }
+}
+
+fn delete_result(r: Result<i64, VaultError>) -> VaultDeleteResult {
+    let (deleted_secrets, error) = count_result(r);
+    VaultDeleteResult {
+        deleted_secrets,
+        error,
+        detail: None,
+    }
+}
+
+#[tauri::command(async)]
+pub fn vault_delete_preview(
+    _args: VaultDeletePreviewArgs,
+    state: State<'_, StorageState>,
+) -> VaultDeletePreviewResult {
+    delete_preview_result(with_vault_storage(&state, vault::delete_preview))
+}
+
+/// Needs the master password but not an unlocked vault. Never logs the password.
+#[tauri::command(async)]
+pub fn vault_delete(
+    mut args: VaultDeleteArgs,
+    state: State<'_, StorageState>,
+    session: State<'_, VaultSession>,
+) -> VaultDeleteResult {
+    let result = with_vault_storage(&state, |s| vault::delete(s, &session, &args.password));
+    args.password.zeroize();
+    delete_result(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -276,6 +363,24 @@ mod tests {
         let r = run(&state, |_| unreachable!());
         assert_eq!(r.error, Some(VaultErrorCode::VaultStorageUnavailable));
         assert!(r.status.is_none());
+    }
+
+    #[test]
+    fn delete_results_follow_the_contract_shape() {
+        assert_eq!(
+            json(delete_result(Ok(3))),
+            r#"{"deleted_secrets":3,"error":null,"detail":null}"#
+        );
+        assert_eq!(
+            json(delete_result(Err(VaultError { code: VaultCode::WrongPassword }))),
+            r#"{"deleted_secrets":0,"error":"vault_wrong_password","detail":null}"#
+        );
+        assert_eq!(
+            json(delete_preview_result(Err(VaultError { code: VaultCode::NotSetUp }))),
+            r#"{"secret_count":0,"error":"vault_not_set_up","detail":null}"#
+        );
+        let args = VaultDeleteArgs { password: "hunter2hunter2".into() };
+        assert!(!format!("{args:?}").contains("hunter2"));
     }
 
     #[test]

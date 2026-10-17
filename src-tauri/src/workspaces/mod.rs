@@ -356,6 +356,71 @@ pub fn delete(storage: &Storage, id: i64) -> Result<(), WorkspaceError> {
     tx.commit().map_err(storage_failure)
 }
 
+/// Ids of workspaces in which every item references `project_id` (and that hold at least one
+/// item). Items with no project, or another project, keep a workspace out of this set.
+fn fully_owned_ids(conn: &Connection, project_id: i64) -> Result<Vec<i64>, WorkspaceError> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT DISTINCT p.workspace_id FROM workspace_items p WHERE p.project_id = ?1 \
+             AND NOT EXISTS (SELECT 1 FROM workspace_items o \
+                             WHERE o.workspace_id = p.workspace_id AND o.project_id IS NOT ?1)",
+        )
+        .map_err(storage_failure)?;
+    let ids = stmt
+        .query_map([project_id], |r| r.get::<_, i64>(0))
+        .map_err(storage_failure)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(storage_failure)?;
+    Ok(ids)
+}
+
+/// Number of workspaces `remove_for_project` would delete entirely; database read only.
+/// Items removed from workspaces that are kept are not counted.
+pub fn count_for_project(conn: &Connection, project_id: i64) -> Result<i64, WorkspaceError> {
+    Ok(fully_owned_ids(conn, project_id)?.len() as i64)
+}
+
+/// Removes the workspaces whose items all reference `project_id` (with those items) and returns
+/// how many workspaces were deleted. In every other workspace only the items referencing
+/// `project_id` are removed and the remaining items are renumbered to `0..n-1`; workspaces with
+/// no such items are untouched. Takes a connection so the caller can run it inside its own
+/// transaction. Registry rows only; the referenced files and folders are never touched.
+pub fn remove_for_project(conn: &Connection, project_id: i64) -> Result<i64, WorkspaceError> {
+    let whole = fully_owned_ids(conn, project_id)?;
+    for id in &whole {
+        conn.execute("DELETE FROM workspace_items WHERE workspace_id = ?1", [id])
+            .map_err(storage_failure)?;
+        conn.execute("DELETE FROM workspaces WHERE id = ?1", [id]).map_err(storage_failure)?;
+    }
+    let partial: Vec<i64> = {
+        let mut stmt = conn
+            .prepare("SELECT DISTINCT workspace_id FROM workspace_items WHERE project_id = ?1")
+            .map_err(storage_failure)?;
+        let rows = stmt.query_map([project_id], |r| r.get(0)).map_err(storage_failure)?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(storage_failure)?
+    };
+    conn.execute("DELETE FROM workspace_items WHERE project_id = ?1", [project_id])
+        .map_err(storage_failure)?;
+    for ws in &partial {
+        let remaining: Vec<i64> = {
+            let mut stmt = conn
+                .prepare("SELECT id FROM workspace_items WHERE workspace_id = ?1 ORDER BY position")
+                .map_err(storage_failure)?;
+            let rows = stmt.query_map([ws], |r| r.get(0)).map_err(storage_failure)?;
+            rows.collect::<Result<Vec<_>, _>>().map_err(storage_failure)?
+        };
+        // Ascending order only moves items to vacated lower positions, so UNIQUE never trips.
+        for (pos, item) in remaining.iter().enumerate() {
+            conn.execute(
+                "UPDATE workspace_items SET position = ?1 WHERE id = ?2",
+                params![pos as i64, item],
+            )
+            .map_err(storage_failure)?;
+        }
+    }
+    Ok(whole.len() as i64)
+}
+
 pub fn add_item(
     storage: &Storage,
     workspace_id: i64,

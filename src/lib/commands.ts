@@ -76,6 +76,13 @@ import type {
   SecretRevealResult,
   SecretCopyResult,
   SecretUpdateArgs,
+  ProjectRemovalPreviewArgs,
+  ProjectRemovalPreviewResult,
+  ProjectUnregisterArgs,
+  ProjectUnregisterResult,
+  VaultDeleteArgs,
+  VaultDeletePreviewResult,
+  VaultDeleteResult,
   VaultLockArgs,
   VaultSetAutoLockArgs,
   VaultSetupArgs,
@@ -299,6 +306,26 @@ export function vaultTouch(): Promise<VaultStatusResult> {
 export function vaultSetAutoLock(minutes: number): Promise<VaultStatusResult> {
   const args: VaultSetAutoLockArgs = { minutes };
   return invoke<VaultStatusResult>("vault_set_auto_lock", { args });
+}
+
+export function projectsRemovalPreview(id: number): Promise<ProjectRemovalPreviewResult> {
+  const args: ProjectRemovalPreviewArgs = { id };
+  return invoke<ProjectRemovalPreviewResult>("projects_removal_preview", { args });
+}
+
+export function projectsUnregister(id: number): Promise<ProjectUnregisterResult> {
+  const args: ProjectUnregisterArgs = { id };
+  return invoke<ProjectUnregisterResult>("projects_unregister", { args });
+}
+
+export function vaultDeletePreview(): Promise<VaultDeletePreviewResult> {
+  const args: Record<string, never> = {};
+  return invoke<VaultDeletePreviewResult>("vault_delete_preview", { args });
+}
+
+export function vaultDelete(password: string): Promise<VaultDeleteResult> {
+  const args: VaultDeleteArgs = { password };
+  return invoke<VaultDeleteResult>("vault_delete", { args });
 }
 
 export function secretsList(args: SecretListArgs): Promise<SecretListResult> {

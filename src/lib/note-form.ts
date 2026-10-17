@@ -27,9 +27,11 @@ export function titleOrPlaceholder(title: string): string {
   return title.trim() === "" ? "Untitled note" : title;
 }
 
+// "Project removed" when the linked project was unregistered; "General" when none is linked.
 export function noteProjectLabel(
-  note: Pick<NoteSummaryView, "project_id" | "project_name">,
+  note: Pick<NoteSummaryView, "project_id" | "project_name" | "project_missing">,
 ): string {
+  if (note.project_missing) return "Project removed";
   return note.project_id === null || note.project_name === null ? "General" : note.project_name;
 }
 

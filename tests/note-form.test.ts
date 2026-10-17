@@ -26,6 +26,7 @@ function note(id: number, projectId: number | null, name: string | null): NoteSu
     title: `n${id}`,
     project_id: projectId,
     project_name: name,
+    project_missing: false,
     updated_at: "2026-01-01T00:00:00Z",
   };
 }
@@ -53,6 +54,9 @@ describe("noteProjectLabel", () => {
   it("returns the project name or General", () => {
     expect(noteProjectLabel(note(1, 5, "Alpha"))).toBe("Alpha");
     expect(noteProjectLabel(note(2, null, null))).toBe("General");
+    expect(noteProjectLabel({ ...note(3, 9, null), project_missing: true })).toBe(
+      "Project removed",
+    );
   });
 });
 

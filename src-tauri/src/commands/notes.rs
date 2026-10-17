@@ -44,6 +44,7 @@ pub struct NoteSummaryView {
     pub title: String,
     pub project_id: Option<i64>,
     pub project_name: Option<String>,
+    pub project_missing: bool,
     pub updated_at: String,
 }
 
@@ -54,6 +55,7 @@ impl From<NoteSummary> for NoteSummaryView {
             title: s.title,
             project_id: s.project_id,
             project_name: s.project_name,
+            project_missing: s.project_missing,
             updated_at: s.updated_at,
         }
     }
@@ -66,6 +68,7 @@ pub struct NoteView {
     pub title: String,
     pub project_id: Option<i64>,
     pub project_name: Option<String>,
+    pub project_missing: bool,
     pub updated_at: String,
     pub body: String,
 }
@@ -87,6 +90,7 @@ impl From<Note> for NoteView {
             title: n.summary.title,
             project_id: n.summary.project_id,
             project_name: n.summary.project_name,
+            project_missing: n.summary.project_missing,
             updated_at: n.summary.updated_at,
             body: n.body,
         }
@@ -308,6 +312,7 @@ mod tests {
             title: "T".into(),
             project_id: Some(2),
             project_name: Some("P".into()),
+            project_missing: false,
             updated_at: "2026-10-12T00:00:00Z".into(),
         }
     }
@@ -337,7 +342,10 @@ mod tests {
         assert_eq!(top, ["detail", "error", "summary"]);
         let mut inner: Vec<_> = ok["summary"].as_object().unwrap().keys().cloned().collect();
         inner.sort();
-        assert_eq!(inner, ["id", "project_id", "project_name", "title", "updated_at"]);
+        assert_eq!(
+            inner,
+            ["id", "project_id", "project_missing", "project_name", "title", "updated_at"]
+        );
     }
 
     #[test]
@@ -351,7 +359,7 @@ mod tests {
         keys.sort();
         assert_eq!(
             keys,
-            ["body", "id", "project_id", "project_name", "title", "updated_at"]
+            ["body", "id", "project_id", "project_missing", "project_name", "title", "updated_at"]
         );
         assert_eq!(v["id"], 7);
         assert_eq!(v["project_name"], "P");

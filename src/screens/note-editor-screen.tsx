@@ -327,6 +327,9 @@ function NoteEditor({ note }: { note: NoteView }) {
           onChange={(event) => onProjectChange(event.target.value)}
         >
           <option value="">General</option>
+          {note.project_missing && note.project_id !== null ? (
+            <option value={String(note.project_id)}>Project removed</option>
+          ) : null}
           {projects.map((project) => (
             <option key={project.id} value={String(project.id)}>
               {project.display_name}

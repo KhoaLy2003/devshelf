@@ -45,6 +45,8 @@ pub struct NoteSummary {
     pub title: String,
     pub project_id: Option<i64>,
     pub project_name: Option<String>,
+    /// The note names a project that is no longer registered; `project_name` is `None` then.
+    pub project_missing: bool,
     pub updated_at: String,
 }
 
@@ -169,11 +171,13 @@ fn summary_by_id(storage: &Storage, id: i64) -> Result<NoteSummary, NoteError> {
         .optional()
         .map_err(storage_err)?
         .ok_or_else(|| NoteError::new(NoteCode::NoteNotFound))?;
+    let name = project_name(storage, project_id)?;
     Ok(NoteSummary {
         id,
         title,
         project_id,
-        project_name: project_name(storage, project_id)?,
+        project_name: name.clone(),
+        project_missing: project_id.is_some() && name.is_none(),
         updated_at,
     })
 }
@@ -206,6 +210,7 @@ pub fn list(storage: &Storage) -> Result<Vec<NoteSummary>, NoteError> {
             title,
             project_id,
             project_name: project_id.and_then(|pid| names.get(&pid).cloned()),
+            project_missing: project_id.is_some_and(|pid| !names.contains_key(&pid)),
             updated_at,
         });
     }

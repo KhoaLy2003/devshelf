@@ -226,15 +226,59 @@ pub fn unlock(
         return Err(VaultError::new(VaultCode::PasswordRequired));
     }
     let meta = read_meta(storage)?.ok_or_else(|| VaultError::new(VaultCode::NotSetUp))?;
-    let wrong = || VaultError::new(VaultCode::WrongPassword);
-
-    // Bad stored salt or cost is treated like a failed verification (AC-25).
-    let key: Zeroizing<[u8; kdf::KEY_LEN]> =
-        kdf::derive(password.as_bytes(), &meta.salt, meta.kdf).map_err(|_| wrong())?;
-    verifier::open(&key, &meta.verifier).map_err(|_| wrong())?;
+    let key = verify_password(&meta, password)?;
 
     session.unlock(key, meta.auto_lock_minutes);
     Ok(status_from(Some(&meta), session))
+}
+
+/// Derives the key from `password` and opens the stored verifier with it. A bad stored salt or
+/// cost is treated like a failed verification (AC-25).
+fn verify_password(
+    meta: &Meta,
+    password: &str,
+) -> Result<Zeroizing<[u8; kdf::KEY_LEN]>, VaultError> {
+    let wrong = || VaultError::new(VaultCode::WrongPassword);
+    let key = kdf::derive(password.as_bytes(), &meta.salt, meta.kdf).map_err(|_| wrong())?;
+    verifier::open(&key, &meta.verifier).map_err(|_| wrong())?;
+    Ok(key)
+}
+
+/// Number of secrets a vault delete would remove. `NotSetUp` when there is no vault.
+pub fn delete_preview(storage: &Mutex<Storage>) -> Result<i64, VaultError> {
+    if read_meta(storage)?.is_none() {
+        return Err(VaultError::new(VaultCode::NotSetUp));
+    }
+    let guard = storage.lock().map_err(|_| unavailable())?;
+    crate::secrets::count_all(guard.connection()).map_err(|_| unavailable())
+}
+
+/// Deletes the vault and every secret. The password is checked like an unlock (verifier decrypt)
+/// but the vault need not be unlocked. A wrong password deletes nothing. Secret rows and the vault
+/// row go in one transaction; afterwards the session key is dropped and the vault reads as not
+/// set up. Notes are untouched. Returns the number of secrets removed.
+pub fn delete(
+    storage: &Mutex<Storage>,
+    session: &VaultSession,
+    password: &str,
+) -> Result<i64, VaultError> {
+    if password.is_empty() {
+        return Err(VaultError::new(VaultCode::PasswordRequired));
+    }
+    let meta = read_meta(storage)?.ok_or_else(|| VaultError::new(VaultCode::NotSetUp))?;
+    // The storage lock is not held while the key is derived.
+    drop(verify_password(&meta, password)?);
+
+    let deleted = {
+        let guard = storage.lock().map_err(|_| unavailable())?;
+        let tx = guard.connection().unchecked_transaction().map_err(|_| unavailable())?;
+        let deleted = crate::secrets::delete_all(&tx).map_err(|_| unavailable())?;
+        tx.execute("DELETE FROM vault_meta WHERE id = 1", []).map_err(|_| unavailable())?;
+        tx.commit().map_err(|_| unavailable())?;
+        deleted
+    };
+    session.lock();
+    Ok(deleted)
 }
 
 pub fn lock(storage: &Mutex<Storage>, session: &VaultSession) -> Result<VaultStatus, VaultError> {
@@ -587,5 +631,93 @@ mod tests {
             assert!(!contains(&bytes, PW.as_bytes()));
             assert!(!contains(&bytes, &key));
         }
+    }
+
+    fn insert_secret(f: &Fixture, label: &str) {
+        exec(
+            f,
+            "INSERT INTO secrets (label, secret_type, project_id, environment, body_enc) \
+             VALUES (?1, 'token', NULL, 'dev', x'00')",
+            [label],
+        );
+    }
+
+    fn secret_count(f: &Fixture) -> i64 {
+        f.storage
+            .lock()
+            .unwrap()
+            .connection()
+            .query_row("SELECT COUNT(*) FROM secrets", [], |r| r.get(0))
+            .unwrap()
+    }
+
+    fn meta_rows(f: &Fixture) -> i64 {
+        f.storage
+            .lock()
+            .unwrap()
+            .connection()
+            .query_row("SELECT COUNT(*) FROM vault_meta", [], |r| r.get(0))
+            .unwrap()
+    }
+
+    #[test]
+    fn delete_with_wrong_password_deletes_nothing() {
+        let f = fixture();
+        set_up(&f);
+        insert_secret(&f, "a");
+        insert_secret(&f, "b");
+        assert_eq!(err(delete(&f.storage, &f.session, "not the password")), VaultCode::WrongPassword);
+        assert_eq!(err(delete(&f.storage, &f.session, "")), VaultCode::PasswordRequired);
+        assert_eq!(secret_count(&f), 2);
+        assert_eq!(meta_rows(&f), 1);
+        assert_eq!(status(&f.storage, &f.session).unwrap().state, VaultState::Unlocked);
+    }
+
+    #[test]
+    fn delete_with_right_password_removes_secrets_and_vault_even_when_locked() {
+        let f = fixture();
+        set_up(&f);
+        insert_secret(&f, "a");
+        insert_secret(&f, "b");
+        lock(&f.storage, &f.session).unwrap();
+        assert_eq!(delete_preview(&f.storage).unwrap(), 2);
+        assert_eq!(delete(&f.storage, &f.session, PW).unwrap(), 2);
+        assert_eq!(secret_count(&f), 0);
+        assert_eq!(meta_rows(&f), 0);
+        let s = status(&f.storage, &f.session).unwrap();
+        assert_eq!(s.state, VaultState::NotSetUp);
+        assert!(f.session.key().is_err());
+        // A new vault can be set up afterwards.
+        assert_eq!(set_up(&f).state, VaultState::Unlocked);
+    }
+
+    #[test]
+    fn delete_while_unlocked_clears_the_key() {
+        let f = fixture();
+        set_up(&f);
+        assert!(f.session.key().is_ok());
+        assert_eq!(delete(&f.storage, &f.session, PW).unwrap(), 0);
+        assert!(f.session.key().is_err());
+        assert_eq!(status(&f.storage, &f.session).unwrap().state, VaultState::NotSetUp);
+    }
+
+    #[test]
+    fn delete_when_not_set_up_is_not_set_up() {
+        let f = fixture();
+        insert_secret(&f, "orphan");
+        assert_eq!(err(delete(&f.storage, &f.session, PW)), VaultCode::NotSetUp);
+        assert_eq!(err(delete_preview(&f.storage)), VaultCode::NotSetUp);
+        assert_eq!(secret_count(&f), 1);
+    }
+
+    #[test]
+    fn delete_is_one_transaction() {
+        let f = fixture();
+        set_up(&f);
+        insert_secret(&f, "a");
+        exec(&f, "CREATE TRIGGER block_meta_delete BEFORE DELETE ON vault_meta BEGIN SELECT RAISE(ABORT, 'blocked'); END;", []);
+        assert_eq!(err(delete(&f.storage, &f.session, PW)), VaultCode::StorageUnavailable);
+        assert_eq!(secret_count(&f), 1);
+        assert_eq!(meta_rows(&f), 1);
     }
 }

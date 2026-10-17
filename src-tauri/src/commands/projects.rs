@@ -4,7 +4,10 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::commands::storage::StorageState;
 use crate::db::Storage;
-use crate::projects::{self, NewProject, Project, ValidationCode, ValidationError};
+use crate::projects::{
+    self, NewProject, Project, RemovalCode, RemovalCounts, RemovalError, ValidationCode,
+    ValidationError,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -278,6 +281,111 @@ pub async fn projects_pick_folder(
     ProjectPickFolderResult { path }
 }
 
+/// Wire form of `projects::RemovalCode`; the strings are the contract with the TypeScript union.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectRemovalErrorCode {
+    ProjectNotFound,
+    ProjectStorageUnavailable,
+}
+
+impl From<RemovalCode> for ProjectRemovalErrorCode {
+    fn from(code: RemovalCode) -> Self {
+        match code {
+            RemovalCode::NotFound => Self::ProjectNotFound,
+            RemovalCode::StorageUnavailable => Self::ProjectStorageUnavailable,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProjectRemovalPreviewArgs {
+    pub id: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProjectRemovalPreviewResult {
+    pub config_count: i64,
+    pub workspace_count: i64,
+    pub error: Option<ProjectRemovalErrorCode>,
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProjectUnregisterArgs {
+    pub id: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProjectUnregisterResult {
+    pub removed_configs: i64,
+    pub removed_workspaces: i64,
+    pub error: Option<ProjectRemovalErrorCode>,
+    pub detail: Option<String>,
+}
+
+/// Locks the storage and runs `f`. A failed storage or poisoned lock is `StorageUnavailable`.
+fn with_removal_storage<T>(
+    state: &StorageState,
+    f: impl FnOnce(&Storage) -> Result<T, RemovalError>,
+) -> Result<T, RemovalError> {
+    let unavailable = || RemovalError { code: RemovalCode::StorageUnavailable };
+    let mutex = state.result.as_ref().map_err(|_| unavailable())?;
+    let guard = mutex.lock().map_err(|_| unavailable())?;
+    f(&guard)
+}
+
+fn preview_result(r: Result<RemovalCounts, RemovalError>) -> ProjectRemovalPreviewResult {
+    match r {
+        Ok(c) => ProjectRemovalPreviewResult {
+            config_count: c.configs,
+            workspace_count: c.workspaces,
+            error: None,
+            detail: None,
+        },
+        Err(e) => ProjectRemovalPreviewResult {
+            config_count: 0,
+            workspace_count: 0,
+            error: Some(e.code.into()),
+            detail: None,
+        },
+    }
+}
+
+fn unregister_result(r: Result<RemovalCounts, RemovalError>) -> ProjectUnregisterResult {
+    match r {
+        Ok(c) => ProjectUnregisterResult {
+            removed_configs: c.configs,
+            removed_workspaces: c.workspaces,
+            error: None,
+            detail: None,
+        },
+        Err(e) => ProjectUnregisterResult {
+            removed_configs: 0,
+            removed_workspaces: 0,
+            error: Some(e.code.into()),
+            detail: None,
+        },
+    }
+}
+
+#[tauri::command]
+pub fn projects_removal_preview(
+    args: ProjectRemovalPreviewArgs,
+    state: State<'_, StorageState>,
+) -> ProjectRemovalPreviewResult {
+    preview_result(with_removal_storage(&state, |s| projects::removal_preview(s, args.id)))
+}
+
+/// Removes database rows only; no file or folder is touched.
+#[tauri::command]
+pub fn projects_unregister(
+    args: ProjectUnregisterArgs,
+    state: State<'_, StorageState>,
+) -> ProjectUnregisterResult {
+    unregister_result(with_removal_storage(&state, |s| projects::unregister(s, args.id)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -338,5 +446,31 @@ mod tests {
         }));
         assert_eq!(r.error, Some(ProjectErrorCode::AlreadyRegistered));
         assert_eq!(r.detail.as_deref(), Some("api"));
+    }
+
+    #[test]
+    fn removal_results_use_contract_shape_and_codes() {
+        let ok = serde_json::to_string(&unregister_result(Ok(RemovalCounts {
+            configs: 2,
+            workspaces: 1,
+        })))
+        .unwrap();
+        assert_eq!(
+            ok,
+            r#"{"removed_configs":2,"removed_workspaces":1,"error":null,"detail":null}"#
+        );
+        let missing = serde_json::to_string(&preview_result(Err(RemovalError {
+            code: RemovalCode::NotFound,
+        })))
+        .unwrap();
+        assert_eq!(
+            missing,
+            r#"{"config_count":0,"workspace_count":0,"error":"project_not_found","detail":null}"#
+        );
+        let unavailable = unregister_result(Err(RemovalError { code: RemovalCode::StorageUnavailable }));
+        assert_eq!(
+            serde_json::to_string(&unavailable.error).unwrap(),
+            "\"project_storage_unavailable\""
+        );
     }
 }

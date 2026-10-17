@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::db::Storage;
 use crate::projects::normalize_path;
@@ -366,6 +366,21 @@ pub fn remove(storage: &Storage, id: i64) -> Result<(), ConfigError> {
         return Err(ConfigError::new(ConfigCode::ConfigNotFound));
     }
     Ok(())
+}
+
+/// Number of entries registered under `project_id`; database read only.
+pub fn count_for_project(conn: &Connection, project_id: i64) -> Result<i64, ConfigError> {
+    conn.query_row("SELECT COUNT(*) FROM config_files WHERE project_id = ?1", [project_id], |r| r.get(0))
+        .map_err(storage_failure)
+}
+
+/// Deletes every entry of `project_id` and returns how many were removed. Takes a connection so
+/// the caller can run it inside its own transaction. Registry rows only; files are never touched.
+pub fn remove_for_project(conn: &Connection, project_id: i64) -> Result<i64, ConfigError> {
+    let removed = conn
+        .execute("DELETE FROM config_files WHERE project_id = ?1", [project_id])
+        .map_err(storage_failure)?;
+    Ok(removed as i64)
 }
 
 #[cfg(test)]

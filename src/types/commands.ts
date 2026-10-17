@@ -459,6 +459,7 @@ export interface NoteSummaryView {
   title: string;
   project_id: number | null;
   project_name: string | null;
+  project_missing: boolean;
   updated_at: string;
 }
 
@@ -467,6 +468,7 @@ export interface NoteView {
   title: string;
   project_id: number | null;
   project_name: string | null;
+  project_missing: boolean;
   updated_at: string;
   body: string;
 }
@@ -648,5 +650,53 @@ export interface SecretCopyResult {
 
 export interface SecretDeleteResult {
   error: SecretCode | null;
+  detail: string | null;
+}
+
+// Project unregister and vault delete (spec: docs/specs/project-removal-and-vault-delete).
+
+export type ProjectRemovalCode = "project_not_found" | "project_storage_unavailable";
+
+export interface ProjectRemovalPreviewArgs {
+  id: number;
+}
+
+export interface ProjectRemovalPreviewResult {
+  config_count: number;
+  workspace_count: number;
+  error: ProjectRemovalCode | null;
+  detail: string | null;
+}
+
+export interface ProjectUnregisterArgs {
+  id: number;
+}
+
+export interface ProjectUnregisterResult {
+  removed_configs: number;
+  removed_workspaces: number;
+  error: ProjectRemovalCode | null;
+  detail: string | null;
+}
+
+export type VaultDeleteCode =
+  | "vault_password_required"
+  | "vault_wrong_password"
+  | "vault_not_set_up"
+  | "vault_storage_unavailable";
+
+export interface VaultDeletePreviewResult {
+  secret_count: number;
+  error: VaultDeleteCode | null;
+  detail: string | null;
+}
+
+export interface VaultDeleteArgs {
+  password: string;
+}
+
+export interface VaultDeleteResult {
+  deleted_secrets: number;
+  error: VaultDeleteCode | null;
   detail: string | null;
 }

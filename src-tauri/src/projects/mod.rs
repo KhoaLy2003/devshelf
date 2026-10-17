@@ -405,6 +405,73 @@ pub fn nested_note(
         .next())
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RemovalCode {
+    NotFound,
+    StorageUnavailable,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemovalError {
+    pub code: RemovalCode,
+}
+
+impl RemovalError {
+    fn new(code: RemovalCode) -> Self {
+        Self { code }
+    }
+}
+
+fn removal_storage_failure<E>(_: E) -> RemovalError {
+    RemovalError::new(RemovalCode::StorageUnavailable)
+}
+
+/// What unregistering a project removes besides the project itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RemovalCounts {
+    pub configs: i64,
+    pub workspaces: i64,
+}
+
+fn project_exists(conn: &Connection, id: i64) -> Result<bool, RemovalError> {
+    conn.query_row("SELECT 1 FROM projects WHERE id = ?1", [id], |_| Ok(()))
+        .optional()
+        .map(|r| r.is_some())
+        .map_err(removal_storage_failure)
+}
+
+/// Counts the config entries and workspaces that [`unregister`] would remove. Read only.
+pub fn removal_preview(storage: &Storage, id: i64) -> Result<RemovalCounts, RemovalError> {
+    let conn = storage.connection();
+    if !project_exists(conn, id)? {
+        return Err(RemovalError::new(RemovalCode::NotFound));
+    }
+    Ok(RemovalCounts {
+        configs: crate::config::count_for_project(conn, id).map_err(removal_storage_failure)?,
+        workspaces: crate::workspaces::count_for_project(conn, id)
+            .map_err(removal_storage_failure)?,
+    })
+}
+
+/// Removes the registration of a project, its config entries and its workspaces in one
+/// transaction; any failure removes nothing. Notes and secrets keep their `project_id` and show
+/// the project as removed. Only database rows are deleted: no file or folder is touched.
+pub fn unregister(storage: &Storage, id: i64) -> Result<RemovalCounts, RemovalError> {
+    let tx = storage.connection().unchecked_transaction().map_err(removal_storage_failure)?;
+    if !project_exists(&tx, id)? {
+        return Err(RemovalError::new(RemovalCode::NotFound));
+    }
+    let configs = crate::config::remove_for_project(&tx, id).map_err(removal_storage_failure)?;
+    let workspaces =
+        crate::workspaces::remove_for_project(&tx, id).map_err(removal_storage_failure)?;
+    // foreign_keys is off, so tags are deleted explicitly rather than by cascade.
+    tx.execute("DELETE FROM project_tags WHERE project_id = ?1", [id])
+        .map_err(removal_storage_failure)?;
+    tx.execute("DELETE FROM projects WHERE id = ?1", [id]).map_err(removal_storage_failure)?;
+    tx.commit().map_err(removal_storage_failure)?;
+    Ok(RemovalCounts { configs, workspaces })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -798,5 +865,187 @@ mod tests {
         reg(&storage, &dir, "proj").unwrap();
         list(&storage).unwrap();
         assert_eq!(snapshot(&dir), before);
+    }
+
+    fn count(storage: &Storage, sql: &str) -> i64 {
+        storage.connection().query_row(sql, [], |r| r.get(0)).unwrap()
+    }
+
+    /// Adds two config entries and one workspace with two items for `project`, one config entry
+    /// and one workspace for `other`, plus a note and a secret row for `project`.
+    fn seed_links(storage: &Storage, project: i64, other: i64) {
+        crate::config::add(storage, project, "F:\\a\\app.yml", "dev", "yaml").unwrap();
+        crate::config::add(storage, project, "F:\\a\\.env", "dev", "dotenv").unwrap();
+        crate::config::add(storage, other, "F:\\b\\app.yml", "dev", "yaml").unwrap();
+        let ws = crate::workspaces::create(storage, "mine").unwrap();
+        for p in ["F:\\a\\x", "F:\\a\\y"] {
+            crate::workspaces::add_item(storage, ws.id, p, "file", Some(project), "windows_default")
+                .unwrap();
+        }
+        let ws2 = crate::workspaces::create(storage, "theirs").unwrap();
+        crate::workspaces::add_item(storage, ws2.id, "F:\\b\\x", "file", Some(other), "windows_default")
+            .unwrap();
+        let conn = storage.connection();
+        conn.execute(
+            "INSERT INTO notes (project_id, title, body_enc) VALUES (?1, 'n', x'00')",
+            [project],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO secrets (label, secret_type, project_id, environment, body_enc) \
+             VALUES ('s', 'token', ?1, 'dev', x'00')",
+            [project],
+        )
+        .unwrap();
+        conn.execute("INSERT INTO project_tags (project_id, tag) VALUES (?1, 'x')", [project]).unwrap();
+    }
+
+    #[test]
+    fn unregister_removes_registration_configs_workspaces_and_keeps_notes_and_secrets() {
+        let tmp = tempfile::tempdir().unwrap();
+        let storage = storage_in(tmp.path());
+        let a = reg(&storage, &folder(tmp.path(), "a"), "a").unwrap();
+        let b = reg(&storage, &folder(tmp.path(), "b"), "b").unwrap();
+        seed_links(&storage, a.id, b.id);
+
+        let preview = removal_preview(&storage, a.id).unwrap();
+        assert_eq!(preview, RemovalCounts { configs: 2, workspaces: 1 });
+        let removed = unregister(&storage, a.id).unwrap();
+        assert_eq!(removed, preview);
+
+        assert!(get(&storage, a.id).unwrap().is_none());
+        assert!(get(&storage, b.id).unwrap().is_some());
+        let pid = |t: &str| count(&storage, &format!("SELECT COUNT(*) FROM {t} WHERE project_id = {}", a.id));
+        assert_eq!(pid("config_files"), 0);
+        assert_eq!(pid("workspace_items"), 0);
+        assert_eq!(pid("project_tags"), 0);
+        assert_eq!(count(&storage, "SELECT COUNT(*) FROM config_files"), 1);
+        assert_eq!(count(&storage, "SELECT COUNT(*) FROM workspaces"), 1);
+        assert_eq!(count(&storage, "SELECT COUNT(*) FROM workspace_items"), 1);
+        assert_eq!(pid("secrets"), 1);
+
+        let notes = crate::notes::list(&storage).unwrap();
+        assert_eq!(notes.len(), 1);
+        assert!(notes[0].project_missing);
+        assert_eq!(notes[0].project_name, None);
+        assert_eq!(notes[0].project_id, Some(a.id));
+    }
+
+    #[test]
+    fn unregister_leaves_disk_unchanged() {
+        let tmp = tempfile::tempdir().unwrap();
+        let storage = storage_in(tmp.path());
+        let dir = folder(tmp.path(), "proj");
+        std::fs::write(dir.join("keep.txt"), b"hello").unwrap();
+        folder(&dir, "sub");
+        let p = reg(&storage, &dir, "proj").unwrap();
+        let before = snapshot(&dir);
+        removal_preview(&storage, p.id).unwrap();
+        unregister(&storage, p.id).unwrap();
+        assert!(dir.is_dir());
+        assert_eq!(snapshot(&dir), before);
+        assert_eq!(std::fs::read(dir.join("keep.txt")).unwrap(), b"hello");
+    }
+
+    #[test]
+    fn unregister_unknown_project_is_not_found_and_changes_nothing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let storage = storage_in(tmp.path());
+        let a = reg(&storage, &folder(tmp.path(), "a"), "a").unwrap();
+        assert_eq!(unregister(&storage, 999).unwrap_err().code, RemovalCode::NotFound);
+        assert_eq!(removal_preview(&storage, 999).unwrap_err().code, RemovalCode::NotFound);
+        assert!(get(&storage, a.id).unwrap().is_some());
+        // A second unregister of the same project is also not found.
+        unregister(&storage, a.id).unwrap();
+        assert_eq!(unregister(&storage, a.id).unwrap_err().code, RemovalCode::NotFound);
+    }
+
+    #[test]
+    fn unregister_rolls_back_when_a_step_fails() {
+        let tmp = tempfile::tempdir().unwrap();
+        let storage = storage_in(tmp.path());
+        let a = reg(&storage, &folder(tmp.path(), "a"), "a").unwrap();
+        seed_links(&storage, a.id, a.id + 100);
+        // Make the final project delete fail after configs and workspaces were deleted.
+        storage
+            .connection()
+            .execute_batch(
+                "CREATE TRIGGER block_project_delete BEFORE DELETE ON projects \
+                 BEGIN SELECT RAISE(ABORT, 'blocked'); END;",
+            )
+            .unwrap();
+        assert_eq!(unregister(&storage, a.id).unwrap_err().code, RemovalCode::StorageUnavailable);
+        assert!(get(&storage, a.id).unwrap().is_some());
+        assert_eq!(removal_preview(&storage, a.id).unwrap(), RemovalCounts { configs: 2, workspaces: 1 });
+        assert_eq!(count(&storage, "SELECT COUNT(*) FROM project_tags"), 1);
+    }
+
+    fn mixed_workspace(storage: &Storage, project: i64, other: i64) -> i64 {
+        let ws = crate::workspaces::create(storage, "mixed").unwrap();
+        for (p, owner) in [
+            ("F:\\m\\a1", Some(project)),
+            ("F:\\m\\b1", Some(other)),
+            ("F:\\m\\a2", Some(project)),
+            ("F:\\m\\n1", None),
+        ] {
+            crate::workspaces::add_item(storage, ws.id, p, "file", owner, "windows_default").unwrap();
+        }
+        ws.id
+    }
+
+    #[test]
+    fn unregister_keeps_mixed_workspace_and_removes_only_the_projects_items() {
+        let tmp = tempfile::tempdir().unwrap();
+        let storage = storage_in(tmp.path());
+        let a = reg(&storage, &folder(tmp.path(), "a"), "a").unwrap();
+        let b = reg(&storage, &folder(tmp.path(), "b"), "b").unwrap();
+        seed_links(&storage, a.id, b.id);
+        let mixed = mixed_workspace(&storage, a.id, b.id);
+
+        // "mine" is fully removed; "mixed" and "theirs" are kept.
+        let preview = removal_preview(&storage, a.id).unwrap();
+        assert_eq!(preview.workspaces, 1);
+        assert_eq!(unregister(&storage, a.id).unwrap(), preview);
+
+        assert_eq!(count(&storage, "SELECT COUNT(*) FROM workspaces"), 2);
+        let w = crate::workspaces::get(&storage, mixed).unwrap().unwrap();
+        let items: Vec<(String, i64, Option<i64>)> =
+            w.items.iter().map(|i| (i.path.clone(), i.position, i.project_id)).collect();
+        assert_eq!(
+            items,
+            vec![("F:\\m\\b1".to_string(), 0, Some(b.id)), ("F:\\m\\n1".to_string(), 1, None)]
+        );
+        assert_eq!(count(&storage, "SELECT COUNT(*) FROM workspace_items"), 3);
+    }
+
+    #[test]
+    fn mixed_only_project_has_zero_workspace_count() {
+        let tmp = tempfile::tempdir().unwrap();
+        let storage = storage_in(tmp.path());
+        let a = reg(&storage, &folder(tmp.path(), "a"), "a").unwrap();
+        let b = reg(&storage, &folder(tmp.path(), "b"), "b").unwrap();
+        let mixed = mixed_workspace(&storage, a.id, b.id);
+        assert_eq!(removal_preview(&storage, a.id).unwrap().workspaces, 0);
+        assert_eq!(unregister(&storage, a.id).unwrap().workspaces, 0);
+        assert!(crate::workspaces::get(&storage, mixed).unwrap().is_some());
+    }
+
+    #[test]
+    fn unregister_rollback_restores_mixed_workspace_items() {
+        let tmp = tempfile::tempdir().unwrap();
+        let storage = storage_in(tmp.path());
+        let a = reg(&storage, &folder(tmp.path(), "a"), "a").unwrap();
+        let mixed = mixed_workspace(&storage, a.id, a.id + 100);
+        storage
+            .connection()
+            .execute_batch(
+                "CREATE TRIGGER block_project_delete BEFORE DELETE ON projects \
+                 BEGIN SELECT RAISE(ABORT, 'blocked'); END;",
+            )
+            .unwrap();
+        assert_eq!(unregister(&storage, a.id).unwrap_err().code, RemovalCode::StorageUnavailable);
+        let w = crate::workspaces::get(&storage, mixed).unwrap().unwrap();
+        assert_eq!(w.items.len(), 4);
+        assert_eq!(w.items.iter().map(|i| i.position).collect::<Vec<_>>(), vec![0, 1, 2, 3]);
     }
 }

@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
+import { useState } from "react";
 import { getProject, setProjectPinned } from "../lib/commands";
+import { UnregisterProjectDialog } from "../components/unregister-project-dialog";
 import { formatProjectError } from "../lib/project-form";
 
 const linkClass =
@@ -16,6 +18,7 @@ export function ProjectDetailScreen() {
   const id = Number(params["id"]);
   const validId = Number.isInteger(id);
   const queryClient = useQueryClient();
+  const [unregisterOpen, setUnregisterOpen] = useState(false);
 
   const query = useQuery({
     queryKey: ["project", id],
@@ -85,6 +88,13 @@ export function ProjectDetailScreen() {
         >
           {project.pinned ? "Unpin" : "Pin"}
         </button>
+        <button
+          type="button"
+          onClick={() => setUnregisterOpen(true)}
+          className="rounded-lg border border-hairline bg-surface-raised px-4 py-2 text-warning hover:border-warning focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          Unregister
+        </button>
       </div>
       {pinError !== null ? (
         <p role="alert" className="m-0 mb-4 text-warning">
@@ -117,6 +127,9 @@ export function ProjectDetailScreen() {
         <dt className="text-ink-muted">Registered</dt>
         <dd className="m-0">{formatRegistered(project.created_at)}</dd>
       </dl>
+      {unregisterOpen ? (
+        <UnregisterProjectDialog projectId={id} onClose={() => setUnregisterOpen(false)} />
+      ) : null}
     </div>
   );
 }

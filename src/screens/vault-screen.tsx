@@ -4,6 +4,7 @@ import { vaultLock, vaultSetAutoLock, vaultSetup, vaultUnlock } from "../lib/com
 import { VAULT_STATUS_KEY, useVaultStatusQuery } from "../lib/use-vault-shell";
 import { formatVaultError, lockReasonText, validateSetup } from "../lib/vault-form";
 import type { VaultCode, VaultStatusResult, VaultStatusView } from "../types/commands";
+import { DeleteVaultDialog } from "../components/delete-vault-dialog";
 
 const AUTO_LOCK_OPTIONS = [
   { value: 0, label: "Never" },
@@ -239,6 +240,7 @@ function UnlockedView({
 export function VaultScreen() {
   const queryClient = useQueryClient();
   const query = useVaultStatusQuery();
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const status = query.data?.status ?? null;
   const publish = (result: VaultStatusResult) => {
@@ -272,6 +274,14 @@ export function VaultScreen() {
         Protected by a master password that stays on this device.
       </p>
       {content}
+      {status !== null && status.state !== "not_set_up" ? (
+        <div className="mt-10 border-t border-hairline pt-6">
+          <button type="button" className={buttonSecondary} onClick={() => setDeleteOpen(true)}>
+            Delete vault
+          </button>
+        </div>
+      ) : null}
+      {deleteOpen ? <DeleteVaultDialog onClose={() => setDeleteOpen(false)} /> : null}
     </div>
   );
 }

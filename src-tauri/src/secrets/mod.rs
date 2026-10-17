@@ -423,6 +423,18 @@ pub fn delete(storage: &Storage, session: &VaultSession, id: i64) -> Result<(), 
     Ok(())
 }
 
+/// Number of stored secrets. Database read only; needs no unlocked vault and never decrypts.
+pub fn count_all(conn: &rusqlite::Connection) -> Result<i64, SecretError> {
+    conn.query_row("SELECT COUNT(*) FROM secrets", [], |r| r.get(0)).map_err(storage_err)
+}
+
+/// Deletes every secret row and returns how many were removed. Used when the vault itself is
+/// deleted, so it needs no unlocked vault; the caller proves the master password first and runs
+/// this inside its own transaction.
+pub fn delete_all(conn: &rusqlite::Connection) -> Result<i64, SecretError> {
+    conn.execute("DELETE FROM secrets", []).map(|n| n as i64).map_err(storage_err)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
