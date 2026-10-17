@@ -111,6 +111,7 @@ Coding standards: [docs/constitution.md](docs/constitution.md).
 - **File naming**: kebab-case for TypeScript/TSX files and folders (`app.tsx`, `quick-open.ts`); snake_case for Rust files and modules (`project_registry.rs`). One folder per Rust domain module.
 - **Tests**: TypeScript tests live in `tests/` and are named `*.test.ts` or `*.test.tsx`. Rust tests live in `#[cfg(test)]` modules beside the code, or in `src-tauri/tests/` for integration tests. Tests use temporary directories, never the real user data folder.
 - **Commit messages**: Conventional Commits, `type(scope): summary` in the imperative mood, with types `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci` (for example `feat(projects): add project registry`).
+- **Releasing**: `feat`, `fix`, `perf`, `refactor`, and breaking commits (`!` after the type, or a `BREAKING CHANGE:` footer) appear in `CHANGELOG.md`. Preview with `npm run release -- <patch|minor|major|X.Y.Z> --dry-run`, then run it without `--dry-run` on a clean tree, then `git push origin HEAD --follow-tags`. While the version is below 1.0, a breaking change or feature is a `minor` bump and a fix is a `patch`; use `major` only from 1.0.0 onward. Edit the in-app Help changelog (`src/lib/help-content.ts`) by hand before releasing.
 
 ## License
 

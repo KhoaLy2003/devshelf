@@ -26,7 +26,8 @@
     "tauri": "tauri",
     "test": "vitest run",
     "lint": "eslint . && prettier --check .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",
