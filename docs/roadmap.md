@@ -44,6 +44,7 @@ The Monday-morning journey (journey-map.md, one persona, five phases, flows F1-F
 | F13 | **Bounded config discovery**: suggest config files for a project by scanning only the project root and user-selected folders with a fixed list of file patterns; the user approves each suggestion before it enters the catalog. Never scans the whole repository content. | Should | M | F06 | deprecated (not in first MVP) |
 | F14 | **Clipboard auto-clear**: after copying a secret, clear the clipboard after a user-set delay. Default and delay are open questions in the idea brief. | Could | S | F09 | deprecated (not in first MVP) |
 | F15 | **Project maintenance**: edit a project's name, type and tags; archive or unregister a project without touching its files. | Could | S | F02 | deprecated (not in first MVP) |
+| F16 | **Help**: in-app guides, feature notes, privacy and security summary, troubleshooting, and a changelog for the first MVP, with deprecated features listed as not in this version. Added after the original list. | Must | S | F01 | shipped |
 
 Counts: Must 10, Should 2, Could 3, Won't (deferred) 12. Total rows in this list: 15.
 
