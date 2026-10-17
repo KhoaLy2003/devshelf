@@ -7,6 +7,7 @@ export const NAV_ITEMS = [
   { path: "/secrets", label: "Secrets" },
   { path: "/notes", label: "Notes" },
   { path: "/settings", label: "Settings" },
+  { path: "/help", label: "Help" },
 ] as const;
 
 export function normalizePath(path: string): string {

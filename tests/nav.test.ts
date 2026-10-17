@@ -12,6 +12,7 @@ describe("NAV_ITEMS", () => {
       ["Secrets", "/secrets"],
       ["Notes", "/notes"],
       ["Settings", "/settings"],
+      ["Help", "/help"],
     ]);
   });
 });

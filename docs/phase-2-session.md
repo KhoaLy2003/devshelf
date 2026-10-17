@@ -227,3 +227,13 @@ Gaps recorded for later:
 - Direct DB writes in the E2E: one `project_id` set to 99999 then reverted to NULL on a test secret (disclosed in the report).
 - Reveal values pass through IPC as strings (same limitation as F08).
 - Built-app smoke (P4) still outstanding for F01–F09.
+
+## help (F16) and MVP reset
+
+- Help screen added (`/help`, nav entry last). Content in `src/lib/help-content.ts`; changelog lists F01–F10 and F16 as shipped; F11–F15 listed under "Not in this version".
+- Roadmap: F11, F12, F13, F14, F15 set to `deprecated (not in first MVP)`. F16 added as shipped.
+- App icon regenerated from a generated 1024 px design (dark rounded square, three blue shelves); `src-tauri/icons` updated; mobile icon folders removed.
+- Test data reset: live `devshelf.sqlite3` and 10 backups moved to `%USERPROFILE%\devshelf-test-archive` (not deleted). E2E reports moved to the same archive under `e2e-reports`. `testing-devshelf` E2E copies removed. Credential Manager entry `notes-data-key.DevShelf` deleted (test notes no longer exist).
+- Unit tests kept in the repo (Vitest and cargo), since they are the regression suite.
+- Verification: lint 0, tsc ok, build ok, Vitest 206, cargo lib 274, zero warnings.
+- Not done: built-app smoke and final E2E on a fresh data folder (next step).
