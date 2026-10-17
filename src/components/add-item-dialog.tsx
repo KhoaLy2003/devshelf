@@ -196,7 +196,7 @@ export function AddItemDialog({ workspaceId, onClose, onAdded }: AddItemDialogPr
           <button
             type="submit"
             disabled={busy}
-            className="rounded-lg bg-accent px-4 py-2 font-medium text-ink hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-50"
+            className="rounded-lg bg-accent px-4 py-2 font-medium text-on-accent hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-50"
           >
             Add item
           </button>

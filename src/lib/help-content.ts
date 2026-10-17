@@ -19,6 +19,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
     body: [
       "DevShelf is a single-user, offline Windows app for organizing your projects, editors, workspaces, config references, private notes, and an encrypted secrets vault.",
       "There is no cloud, no sync, and no telemetry. Everything stays on this computer.",
+      "Appearance: choose Dark or Light in Settings. Dark is the default.",
     ],
   },
   {

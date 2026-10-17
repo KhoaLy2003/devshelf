@@ -9,6 +9,7 @@
   --color-ink-muted: #b2b6bd;
   --color-accent: #2b89ff;
   --color-warning: #ffcf25;
+  --color-on-accent: #ffffff;
   --font-sans: Inter, "Segoe UI", system-ui, sans-serif;
 }
 
@@ -24,4 +25,17 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --color-canvas: #ffffff;
+  --color-surface: #f4f5f7;
+  --color-surface-raised: #e9ebef;
+  --color-hairline: #c9cdd4;
+  --color-ink: #0e1116;
+  --color-ink-muted: #4a515c;
+  --color-accent: #1f6fe0;
+  --color-on-accent: #ffffff;
+  --color-warning: #9a5b00;
+  color-scheme: light;
 }

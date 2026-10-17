@@ -7,7 +7,7 @@ import { listWorkspaces } from "../lib/commands";
 import { formatWorkspaceError } from "../lib/workspace-form";
 
 const primaryButtonClass =
-  "rounded-lg bg-accent px-4 py-2 font-medium text-ink hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
+  "rounded-lg bg-accent px-4 py-2 font-medium text-on-accent hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 
 export function WorkspacesScreen() {
   const query = useQuery({ queryKey: ["workspaces"], queryFn: listWorkspaces });
