@@ -20,6 +20,7 @@ Tauri 2 (WebView2) shell; React + TypeScript + Vite UI; Rust core; SQLite via `r
 - `npm run tauri dev` - run the app.
 - `npm run build` - tsc typecheck + Vite build.
 - `npm run test` - Vitest. `npm run lint` - ESLint + Prettier check. `npm run format` - Prettier write.
+- `npm run release -- <patch|minor|major|X.Y.Z> [--dry-run]` - bump all version locations, prepend a `CHANGELOG.md` section, commit, and tag `v<version>`. Never pushes.
 - In `src-tauri/`: `cargo test`, `cargo build`. Cargo is at `%USERPROFILE%\.cargo\bin`.
 
 ## Conventions

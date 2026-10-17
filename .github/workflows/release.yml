@@ -1,0 +1,35 @@
+name: Release
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-tag:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check tag matches version files and CHANGELOG
+        shell: bash
+        run: |
+          node --input-type=module -e "
+          import { readVersions, readChangelogTopVersion } from './scripts/release-lib.mjs';
+          const tag = process.env.GITHUB_REF_NAME.replace(/^v/, '');
+          const found = new Set([...Object.values(readVersions()), readChangelogTopVersion()]);
+          if (found.size !== 1 || !found.has(tag)) {
+            console.error('Tag ' + tag + ' does not match: ' + [...found].join(', '));
+            process.exit(1);
+          }
+          console.log('Tag ' + tag + ' matches all version locations and CHANGELOG');
+          "
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run test
