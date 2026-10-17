@@ -709,6 +709,36 @@ mod tests {
         assert!(!none.project_missing);
     }
 
+    // AC-A08: a new project must not take over the secrets of an unregistered one
+    #[test]
+    fn secrets_of_an_unregistered_project_stay_missing_after_a_new_registration() {
+        let f = fixture();
+        let new_project = |name: &str| {
+            let dir = f.dir.path().join(name);
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = crate::projects::validate_path(&dir.to_string_lossy()).unwrap();
+            crate::projects::register(
+                &f.storage,
+                path,
+                crate::projects::NewProject {
+                    display_name: name.to_string(),
+                    project_type: "Other".to_string(),
+                    tags_raw: String::new(),
+                },
+            )
+            .unwrap()
+        };
+        let a = new_project("a");
+        add(&f, "kept", Some(a.id));
+        crate::projects::unregister(&f.storage, a.id).unwrap();
+        let b = new_project("b");
+        assert_ne!(b.id, a.id);
+
+        let items = list(&f.storage, &f.session, SecretFilter { project: None, secret_type: None }).unwrap();
+        assert_eq!(items.len(), 1);
+        assert!(items[0].project_missing);
+    }
+
     // AC-17, AC-18
     #[test]
     fn copy_writes_clipboard_and_returns_no_value() {
@@ -849,6 +879,6 @@ mod tests {
         assert!(ins("token", None, "a", "dev").is_ok());
         assert!(ins("token", None, "A", "dev").is_err());
         assert!(ins("token", Some(1), "a", "dev").is_ok());
-        assert_eq!(f.storage.schema_version(), 10);
+        assert_eq!(f.storage.schema_version(), 11);
     }
 }

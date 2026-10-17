@@ -1,6 +1,6 @@
 use rusqlite_migration::{Migrations, M};
 
-pub const MIGRATIONS_COUNT: usize = 10;
+pub const MIGRATIONS_COUNT: usize = 11;
 
 pub fn migrations() -> Migrations<'static> {
     Migrations::new(vec![
@@ -109,6 +109,24 @@ CREATE TABLE workspace_items (
 CREATE UNIQUE INDEX secrets_label_per_project ON secrets(COALESCE(project_id, -1), label COLLATE NOCASE);
 -- project_id has no foreign key so a removed project keeps its secrets (shown as removed).
 -- body_enc is nonce || XChaCha20-Poly1305 ciphertext under the vault key; never plaintext.",
+        ),
+        M::up(
+            "CREATE TABLE projects_new (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  display_name TEXT NOT NULL,
+  root_path TEXT NOT NULL,
+  path_key TEXT NOT NULL UNIQUE,
+  drive TEXT NOT NULL,
+  project_type TEXT NOT NULL,
+  pinned INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+INSERT INTO projects_new (id, display_name, root_path, path_key, drive, project_type, pinned, created_at)
+  SELECT id, display_name, root_path, path_key, drive, project_type, pinned, created_at FROM projects;
+DROP TABLE projects;
+ALTER TABLE projects_new RENAME TO projects;
+-- AUTOINCREMENT so an unregistered project's id is never reused: notes and secrets keep project_id
+-- without a foreign key and must show \"Project removed\" instead of attaching to a new project.",
         ),
     ])
 }

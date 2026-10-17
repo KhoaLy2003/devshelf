@@ -932,6 +932,33 @@ mod tests {
     }
 
     #[test]
+    fn registering_after_unregister_never_reuses_the_id() {
+        let tmp = tempfile::tempdir().unwrap();
+        let storage = storage_in(tmp.path());
+        let a = reg(&storage, &folder(tmp.path(), "a"), "a").unwrap();
+        unregister(&storage, a.id).unwrap();
+        let b = reg(&storage, &folder(tmp.path(), "b"), "b").unwrap();
+        assert!(b.id > a.id, "id {} must not reuse removed id {}", b.id, a.id);
+    }
+
+    #[test]
+    fn notes_of_an_unregistered_project_stay_missing_after_a_new_registration() {
+        let tmp = tempfile::tempdir().unwrap();
+        let storage = storage_in(tmp.path());
+        let a = reg(&storage, &folder(tmp.path(), "a"), "a").unwrap();
+        let b = reg(&storage, &folder(tmp.path(), "b"), "b").unwrap();
+        seed_links(&storage, a.id, b.id);
+        unregister(&storage, a.id).unwrap();
+        let c = reg(&storage, &folder(tmp.path(), "c"), "c").unwrap();
+        assert_ne!(c.id, a.id);
+
+        let notes = crate::notes::list(&storage).unwrap();
+        assert_eq!(notes.len(), 1);
+        assert!(notes[0].project_missing);
+        assert_eq!(notes[0].project_name, None);
+    }
+
+    #[test]
     fn unregister_leaves_disk_unchanged() {
         let tmp = tempfile::tempdir().unwrap();
         let storage = storage_in(tmp.path());

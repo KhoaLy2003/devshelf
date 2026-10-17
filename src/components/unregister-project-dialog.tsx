@@ -20,6 +20,7 @@ const INVALIDATED_KEYS = [
   "home",
   "config-files",
   "workspaces",
+  "workspace",
   "notes",
   "secrets",
 ];

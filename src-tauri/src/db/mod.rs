@@ -55,6 +55,10 @@ pub fn open_in(folder: &Path) -> Result<Storage, StorageError> {
         return Err(StorageError::SchemaTooNew);
     }
 
+    // The bundled SQLite enforces foreign keys by default. Turn them off (outside any migration
+    // transaction, where the pragma would be a no-op) so table rebuilds never cascade-delete rows.
+    conn.pragma_update(None, "foreign_keys", false)
+        .map_err(|_| StorageError::Unavailable)?;
     migrations::migrations()
         .to_latest(&mut conn)
         .map_err(|_| StorageError::Unavailable)?;
@@ -76,7 +80,7 @@ mod tests {
         let folder = tmp.path().join("a").join("b");
         let storage = open_in(&folder).unwrap();
         assert!(folder.join(DB_FILE_NAME).is_file());
-        assert_eq!(storage.schema_version(), 10);
+        assert_eq!(storage.schema_version(), 11);
     }
 
     #[test]
@@ -113,7 +117,7 @@ mod tests {
                 .unwrap();
         }
         let second = open_in(tmp.path()).unwrap();
-        assert_eq!(second.schema_version(), 10);
+        assert_eq!(second.schema_version(), 11);
         let (title, body, created, updated): (String, Vec<u8>, String, String) = second
             .conn
             .query_row(
@@ -126,6 +130,63 @@ mod tests {
         assert_eq!(body, vec![0x0A, 0x0B]);
         assert_eq!(created.len(), 20);
         assert_eq!(updated.len(), 20);
+    }
+
+    #[test]
+    fn migration_11_makes_project_ids_autoincrement_and_keeps_rows() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(DB_FILE_NAME);
+        {
+            let mut conn = Connection::open(&path).unwrap();
+            migrations::migrations().to_version(&mut conn, 10).unwrap();
+            for (id, name) in [(3, "a"), (7, "b")] {
+                conn.execute(
+                    "INSERT INTO projects (id, display_name, root_path, path_key, drive, project_type, pinned) \
+                     VALUES (?1, ?2, ?2, ?2, 'F', 'Other', 1)",
+                    rusqlite::params![id, name],
+                )
+                .unwrap();
+            }
+            conn.execute("INSERT INTO project_tags (project_id, tag) VALUES (3, 't1'), (7, 't2')", [])
+                .unwrap();
+        }
+        let storage = open_in(tmp.path()).unwrap();
+        assert_eq!(storage.schema_version(), 11);
+        let rows: Vec<(i64, String, i64, String)> = storage
+            .conn
+            .prepare("SELECT id, display_name, pinned, created_at FROM projects ORDER BY id")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(rows.len(), 2);
+        assert_eq!((rows[0].0, rows[0].1.as_str(), rows[0].2), (3, "a", 1));
+        assert_eq!((rows[1].0, rows[1].1.as_str(), rows[1].2), (7, "b", 1));
+        assert_eq!(rows[0].3.len(), 20);
+        let tags: i64 = storage
+            .conn
+            .query_row("SELECT COUNT(*) FROM project_tags", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(tags, 2);
+
+        // Ids are never reused, even after deleting the highest one.
+        storage.conn.execute("DELETE FROM projects WHERE id = 7", []).unwrap();
+        storage
+            .conn
+            .execute(
+                "INSERT INTO projects (display_name, root_path, path_key, drive, project_type) \
+                 VALUES ('c', 'c', 'c', 'F', 'Other')",
+                [],
+            )
+            .unwrap();
+        assert_eq!(storage.conn.last_insert_rowid(), 8);
+        let unique_dup = storage.conn.execute(
+            "INSERT INTO projects (display_name, root_path, path_key, drive, project_type) \
+             VALUES ('d', 'd', 'c', 'F', 'Other')",
+            [],
+        );
+        assert!(unique_dup.is_err(), "path_key must stay unique");
     }
 
     #[test]
@@ -185,5 +246,17 @@ mod tests {
         std::fs::write(&path, b"not a database").unwrap();
         assert_eq!(open_in(tmp.path()).unwrap_err(), StorageError::Unavailable);
         assert_eq!(std::fs::read(&path).unwrap(), b"not a database");
+    }
+
+    #[test]
+    fn foreign_keys_are_off_on_the_returned_connection() {
+        // The bundled SQLite defaults to ON; the domain code deletes dependents explicitly.
+        let tmp = tempfile::tempdir().unwrap();
+        let storage = open_in(tmp.path()).unwrap();
+        let fk: i64 = storage
+            .conn
+            .pragma_query_value(None, "foreign_keys", |r| r.get(0))
+            .unwrap();
+        assert_eq!(fk, 0);
     }
 }
