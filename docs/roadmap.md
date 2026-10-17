@@ -46,7 +46,7 @@ The Monday-morning journey (journey-map.md, one persona, five phases, flows F1-F
 | F15 | **Project maintenance**: edit a project's name, type and tags; archive or unregister a project without touching its files. | Could | S | F02 | deprecated (not in first MVP) |
 | F16 | **Help**: in-app guides, feature notes, privacy and security summary, troubleshooting, and a changelog for the first MVP, with deprecated features listed as not in this version. Added after the original list. | Must | S | F01 | shipped |
 
-Counts: Must 10, Should 2, Could 3, Won't (deferred) 12. Total rows in this list: 15.
+Counts: Must 11 (F01–F10 and F16), Should 2 (deprecated), Could 3 (deprecated), Won't (deferred) 12. Total rows in this list: 16. Deprecated for the first MVP: F11–F15.
 
 ---
 

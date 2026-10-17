@@ -4,9 +4,9 @@
 
 - **Status**: `approved`
 - **Project**: DevShelf
-- **Version**: 1.1.0
+- **Version**: 2.0.0
 - **Ratified**: 2026-10-12
-- **Last amended**: 2026-10-11
+- **Last amended**: 2026-10-17
 - **Based on**: `architecture.md`, `DESIGN.md`, `roadmap.md`
 
 > Read by every Phase 2 step. Every principle must change at least one downstream plan or diff. Personal workflow preferences do not belong here.
@@ -92,7 +92,7 @@
 
 - Stack is fixed by `architecture.md`: Tauri 2, React, TypeScript, Vite, Rust, SQLite via `rusqlite`, Tailwind v4, shadcn/ui, React Router, TanStack Query, `cmdk`. Adding a runtime dependency that changes this list requires an amendment (MINOR).
 - Windows 10 and 11 are the only supported platforms. WebView2 is required.
-- Visual design follows `docs/DESIGN.md`. Screens built without a per-screen spec use `docs/preview/index.html` as the reference. The dark theme is the only theme.
+- Visual design follows `docs/DESIGN.md`. Screens built without a per-screen spec use `docs/preview/index.html` as the reference. The dark theme is the default; a light theme is available in Settings > Appearance (amendment 2.0.0, 2026-10-17). Both themes use the same semantic tokens; no screen hard-codes a color.
 - Code and comments are English.
 
 ---

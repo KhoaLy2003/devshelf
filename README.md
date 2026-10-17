@@ -13,7 +13,11 @@ npm install
 npm run tauri dev
 ```
 
-The window shows a hello page with the value returned by the Rust `app_info` command.
+Installed build: run `npm run tauri build`, then install from `src-tauri\target\release\bundle\nsis\DevShelf_0.1.0_x64-setup.exe` (or the `.msi`), or run `src-tauri\target\release\devshelf.exe` directly. The installer is not code-signed, so Windows SmartScreen may warn on first run.
+
+The app data folder is `%APPDATA%\app.devshelf.desktop`. Nothing is sent over the network.
+
+Features in this version: projects, editor profiles, workspace builder and restore, config catalog, Home overview, private notes (encrypted bodies), vault (master password, auto-lock), secret entries (masked, reveal, copy), Help, and a Dark or Light appearance option. See the in-app Help screen for guides and the changelog.
 
 Other commands: `npm run build` (typecheck and Vite build), `npm run test` (Vitest), `npm run lint` (ESLint and Prettier check), `cargo test` and `cargo build` inside `src-tauri/`.
 
