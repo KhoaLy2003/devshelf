@@ -220,3 +220,43 @@ Visited Home, Projects, Workspaces, Config Catalog, Vault, Secrets, Notes, Setti
 - Credential Manager: `notes-data-key.DevShelf` was absent at the start and created during this run, so I ran `cmdkey /delete:notes-data-key.DevShelf` ("Credential deleted successfully."); `cmdkey /list` then no longer showed it.
 - `%APPDATA%\app.devshelf.desktop` ends EMPTY (listing `[]`).
 - `%TEMP%\devshelf-removal-e2e` was created by this run and was removed (it held the test folders alpha, beta, gamma, helper scripts and screenshots; the folders' hashes were recorded above).
+
+## Re-check after fixes
+
+Targeted re-check of D1 and D2 on the rebuilt `src-tauri/target/release/devshelf.exe` (PID 17764), 2026-10-17 about 17:50 to 17:59 local. Driven through WebView2 CDP (port 9222) with real mouse, key and text events; DB read read-only with `bun:sqlite`. Test folders under `%TEMP%\devshelf-recheck-e2e\`. Start state: `%APPDATA%\app.devshelf.desktop` existed and was empty (0 entries); no `notes-data-key.DevShelf` credential; no test folder. No source changes, no npm, no build.
+
+| Check | Result |
+|---|---|
+| D2-1 id reuse (AC-A07/AC-A08) | PASS |
+| D2-2 second reuse | PASS |
+| D1 stale workspace detail (full-ownership case) | PASS |
+| D1 mixed workspace, reopened immediately | PASS |
+| R1 preview counts | PASS |
+| P1 plaintext | PASS |
+
+### D2-1 and D2-2: PASS
+- Schema now: `projects.id INTEGER PRIMARY KEY AUTOINCREMENT`; `sqlite_sequence` exists (it did not in the original run).
+- Vault set up. Alpha registered: id 1. Note "Recheck note" (id 1, Alpha, body `RECHECK-NOTE`, `notes.project_id` 1). Secret "Recheck key" (id 1, API key, dev, Alpha, `RECHECK-SECRET`, `secrets.project_id` 1).
+- Unregistered Alpha from its detail page (confirmed). Preview had no "This also removes" line. `projects` empty; `sqlite_sequence` projects seq = 1.
+- Gamma registered: id 2 (differs from 1). Notes list: "Recheck note, Project removed". Secrets list: "Recheck key, API key · Project removed · Dev". DB: `notes.project_id` 1, `secrets.project_id` 1, `sqlite_sequence` projects seq = 2 (>= 1).
+- D2-2: unregistered Gamma (confirmed); note and secret still "Project removed". Delta registered: id 3 (differs from 1 and 2); note and secret still "Project removed". DB: both project_id 1, seq = 3.
+- Ids: Alpha 1, Gamma 2, Delta 3 (later Stale 4, Other 5, Keep 6; seq ended at 6).
+
+### D1 stale workspace detail: PASS
+Items added by path through "Add item" get `project_id` NULL, so I set each row's Project select with real key events and confirmed `project_id` 4 in the DB.
+- Project "Recheck Stale" (id 4) with `stale\a.txt`, `stale\b.txt`; workspace "Recheck WS" (id 1). Detail BEFORE: "2 items, reopened in this order", rows `a.txt` and `b.txt`, both project Recheck Stale.
+- Unregister preview: "This also removes 1 workspace." Confirmed.
+- Workspaces list after: "No workspaces yet". DB: workspaces 0, workspace_items 0. Extra (direct hash navigation to `#/workspaces/1`): "Workspace not found / This workspace no longer exists."
+- Mixed case: Other (id 5, `other\c.txt`), Keep (id 6, `keep\k1.txt`); workspace "Recheck Mixed" (got id 1 again; `workspaces.id` has no AUTOINCREMENT, and the detail still showed fresh data). Detail BEFORE: "2 items": k1.txt (Recheck Keep), c.txt (Recheck Other). Unregistered Keep, then immediately opened Recheck Mixed from the Workspaces list (list showed "Recheck Mixed, Recheck Other, 1 item"). Detail AFTER: "1 item", one row c.txt (project Recheck Other), no k1.txt; same at +2.5 s. DB: one item (id 2, workspace 1, position 0, project 5).
+
+### R1 preview counts: PASS
+- Keep (its workspace also holds Other's item): no "This also removes" line, correct since nothing is fully owned by Keep; the workspace survived in the DB.
+- Other, after Keep was gone: "This also removes 1 workspace." (cancelled, nothing changed).
+
+### P1 plaintext: PASS
+`devshelf.sqlite3` (106,496 bytes, scanned while the app ran; no `-wal`/`-shm`): `RECHECK-NOTE` UTF-8 0, UTF-16LE 0; `RECHECK-SECRET` UTF-8 0, UTF-16LE 0; extra `E2E-Release-Pass-2026` 0 and 0.
+
+### Cleanup
+- App closed with `WM_CLOSE` to its window (PID 17764, started by this run); verified gone. No process was killed by name or otherwise; the cleanup script only read `Get-Process devshelf` (0 found).
+- DB moved (not deleted) to `C:\Users\Admin\devshelf-test-archive\recheck-e2e-20261017175934\devshelf.sqlite3`, 106,496 bytes, SHA-256 `d5ce75cf3fd112810573ff9712fc567e8eaa8f38bfc9d6c7c342405f3d8643f7`.
+- Data folder `%APPDATA%\app.devshelf.desktop` is empty. Credential `notes-data-key.DevShelf` was absent at the start and created in this run, so it was deleted (`cmdkey /delete`), as the brief required. Consequence: the note body in the archived DB can no longer be decrypted (its key is gone). `%TEMP%\devshelf-recheck-e2e` was created by this run and removed.

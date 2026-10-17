@@ -43,10 +43,10 @@ The Monday-morning journey (journey-map.md, one persona, five phases, flows F1-F
 | F12 | **Encrypted backup and restore**: export all DevShelf data to a single encrypted file and restore it, with the restore verified before it replaces current data. Idea brief lists it in MVP scope; not required for the first usable release. | Could | L | F05, F06, F07, F09 | deprecated (not in first MVP) |
 | F13 | **Bounded config discovery**: suggest config files for a project by scanning only the project root and user-selected folders with a fixed list of file patterns; the user approves each suggestion before it enters the catalog. Never scans the whole repository content. | Should | M | F06 | deprecated (not in first MVP) |
 | F14 | **Clipboard auto-clear**: after copying a secret, clear the clipboard after a user-set delay. Default and delay are open questions in the idea brief. | Could | S | F09 | deprecated (not in first MVP) |
-| F15 | **Project maintenance**: edit a project's name, type and tags; archive or unregister a project without touching its files. | Could | S | F02 | deprecated (not in first MVP) |
+| F15 | **Project unregister**: remove a project's registration without touching its files; removes its config entries and fully owned workspaces; notes and secrets stay and show "Project removed". Reinstated for the first release, narrowed to unregister. Editing name, type and tags remains deferred. | Could | S | F02 | shipped |
 | F16 | **Help**: in-app guides, feature notes, privacy and security summary, troubleshooting, and a changelog for the first MVP, with deprecated features listed as not in this version. Added after the original list. | Must | S | F01 | shipped |
 
-Counts: Must 11 (F01–F10 and F16), Should 2 (deprecated), Could 3 (deprecated), Won't (deferred) 12. Total rows in this list: 16. Deprecated for the first MVP: F11–F15.
+Counts: Must 11 (F01–F10 and F16), Could 3 (F12, F14 deprecated; F15 shipped), Should 2 (deprecated), Won't (deferred) 12. Total rows in this list: 16. Deprecated for the first MVP: F11–F14. Vault delete (spec: docs/specs/project-removal-and-vault-delete) ships within F08's area and is recorded in the session log.
 
 ---
 

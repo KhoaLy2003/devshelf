@@ -136,7 +136,9 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
           "F08 Vault access control",
           "F09 Secret entries",
           "F10 Home overview",
+          "F15 Project unregister (removes registration only; files are not touched)",
           "F16 Help",
+          "Vault delete (requires the master password; removes all secrets)",
         ],
       },
       {
@@ -146,7 +148,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
           "F12 Encrypted backup and restore: not in this version.",
           "F13 Bounded config discovery: not in this version.",
           "F14 Clipboard auto-clear: not in this version.",
-          "F15 Project maintenance: not in this version.",
+          "F15 Project maintenance (editing name, type and tags): not in this version.",
         ],
       },
     ],

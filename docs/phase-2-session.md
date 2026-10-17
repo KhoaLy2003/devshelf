@@ -237,3 +237,15 @@ Gaps recorded for later:
 - Unit tests kept in the repo (Vitest and cargo), since they are the regression suite.
 - Verification: lint 0, tsc ok, build ok, Vitest 206, cargo lib 274, zero warnings.
 - Not done: built-app smoke and final E2E on a fresh data folder (next step).
+
+## project unregister and vault delete (release scope)
+
+- Spec approved: docs/specs/project-removal-and-vault-delete/spec.md. Defaults approved: config entries and fully owned workspaces removed with the project; notes and secrets kept as "Project removed"; vault delete requires the master password and typed DELETE.
+- Workspace rule changed after review to the safer one: a workspace is removed only when every item belongs to the project; mixed workspaces keep other projects' items.
+- Defects found in E2E and fixed: D2 project ids were reused after unregister (migration 11 uses AUTOINCREMENT); D1 workspace detail stale after unregister (invalidated).
+- Behaviour change: foreign keys are off on every connection (the bundled SQLite default is on; earlier comments said off). All domain deletes are explicit.
+- Light accent darkened to meet 4.5:1 on light surfaces; stale html dark class removed.
+- Settings Reset: E2E reported it does not clear saved profiles; rejected, because spec AC-10 says Reset restores the last saved values.
+- E2E: docs/E2E-TESTS-release.md (19 PASS), docs/E2E-TESTS-removal.md (21 scripted PASS, 2 defects, re-check 6 PASS).
+- Known gap (not fixed): workspace ids are reused after delete (no AUTOINCREMENT). The re-check shows no visible effect; items are deleted explicitly.
+- Known gap (not fixed): the Credential Manager key for notes (notes-data-key.DevShelf) is deleted during test cleanup; a new user gets a new key on first note.
