@@ -17,7 +17,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
     id: "start",
     title: "Start here",
     body: [
-      "DevShelf is a single-user, offline Windows app for organizing your projects, editors, workspaces, config references, private notes, and an encrypted secrets vault.",
+      "DevShelf is a single-user, local-first Windows app for organizing your projects, editors, workspaces, config references, private notes, and an encrypted secrets vault.",
       "There is no cloud, no sync, and no telemetry. Everything stays on this computer.",
       "Appearance: choose Dark or Light in Settings. Dark is the default.",
     ],
@@ -102,7 +102,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
     id: "privacy",
     title: "Privacy and security",
     body: [
-      "DevShelf makes no network calls.",
+      "DevShelf's only network use is checking GitHub Releases for updates, at startup (you can turn this off in Settings) or when you click Check for updates. No data about you or your projects is sent.",
       "All data stays in your Windows user data folder: %APPDATA%\\app.devshelf.desktop.",
       "Secrets and note bodies are encrypted.",
       "Plaintext secrets are sent to the screen only when you explicitly reveal or copy them.",
@@ -139,6 +139,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
           "F15 Project unregister (removes registration only; files are not touched)",
           "F16 Help",
           "Vault delete (requires the master password; removes all secrets)",
+          "Updates: DevShelf checks GitHub Releases at startup (turn this off in Settings) or on demand, and installs only after you confirm",
         ],
       },
       {
