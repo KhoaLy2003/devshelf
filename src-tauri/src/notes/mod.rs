@@ -7,11 +7,14 @@ mod keys;
 use std::collections::HashMap;
 
 use rusqlite::{params, OptionalExtension};
+use zeroize::Zeroizing;
 
 use crate::db::Storage;
 use crate::projects;
 
 pub use keys::{CredentialKeyStore, KeyBytes, KeyStore};
+#[cfg(test)]
+pub use keys::MemoryKeyStore;
 
 pub const MAX_TITLE_CHARS: usize = 200;
 pub const MAX_BODY_BYTES: usize = 1_000_000;
@@ -310,6 +313,65 @@ pub fn delete(storage: &Storage, id: i64) -> Result<(), NoteError> {
         return Err(NoteError::new(NoteCode::NoteNotFound));
     }
     Ok(())
+}
+
+/// A note with its body decrypted, for the plaintext export only. No `Debug`: it holds the body.
+pub struct ExportedNote {
+    pub id: i64,
+    pub title: String,
+    pub project_id: Option<i64>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub body: Zeroizing<String>,
+}
+
+/// Decrypts every note in id order. Returns before touching the key when no notes exist, so an
+/// empty store never mints a key. A body that fails to decrypt aborts the whole export.
+pub fn export_all(
+    storage: &Storage,
+    keys: &dyn KeyStore,
+    loaded: Option<KeyBytes>,
+) -> Result<Vec<ExportedNote>, NoteError> {
+    if !any_notes(storage)? {
+        return Ok(Vec::new());
+    }
+    let key = resolve_key(storage, keys, loaded)?;
+    let mut stmt = storage
+        .connection()
+        .prepare(
+            "SELECT id, title, project_id, created_at, updated_at, body_enc FROM notes ORDER BY id",
+        )
+        .map_err(storage_err)?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, Option<i64>>(2)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, String>(4)?,
+                r.get::<_, Vec<u8>>(5)?,
+            ))
+        })
+        .map_err(storage_err)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(storage_err)?;
+    let mut out = Vec::with_capacity(rows.len());
+    for (id, title, project_id, created_at, updated_at, blob) in rows {
+        let plain =
+            crypto::decrypt(&key, id, &blob).map_err(|_| NoteError::new(NoteCode::BodyUnreadable))?;
+        let body =
+            String::from_utf8(plain).map_err(|_| NoteError::new(NoteCode::BodyUnreadable))?;
+        out.push(ExportedNote {
+            id,
+            title,
+            project_id,
+            created_at,
+            updated_at,
+            body: Zeroizing::new(body),
+        });
+    }
+    Ok(out)
 }
 
 #[cfg(test)]

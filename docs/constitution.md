@@ -18,7 +18,7 @@
 ### Principle 1: Secrets Stay in the Rust Core
 
 **MUST**:
-- Plaintext secret values exist only in Rust memory and in the response to an explicit reveal or copy command. No secret value is written to logs, to SQLite, or to a file.
+- Plaintext secret values exist only in Rust memory and in the response to an explicit reveal or copy command. No secret value is written to logs, to SQLite, or to a file. The only exception is the user-initiated plaintext export (Settings → Export data), which requires the master password re-entered, a shown warning and an acknowledged checkbox, and writes only to a folder the user picked in a native dialog. Export plaintext is held in `Zeroizing` buffers, but growing a `Vec` can leave freed copies in heap memory until overwritten; this residual is accepted and documented. Generated passwords are returned to the webview only in the `password_generate` response and are never written anywhere by DevShelf.
 - Every type holding key material or a plaintext secret derives or implements `zeroize` on drop. Unlocked keys are cleared on vault lock and on auto-lock.
 - Secret and note fields are encrypted with XChaCha20-Poly1305 using a fresh random nonce per write. Nonce reuse is a defect.
 - Argon2id parameters are set in one module and are not overridden per call. Tests use the same code path with lower cost only through an explicit test-only constructor.

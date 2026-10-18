@@ -6,6 +6,8 @@ mod commands;
 mod config;
 mod db;
 mod editors;
+mod export;
+mod generator;
 mod notes;
 mod projects;
 mod secrets;
@@ -51,6 +53,7 @@ pub fn run() {
             commands::projects::projects_get,
             commands::projects::projects_register,
             commands::projects::projects_check_path,
+            commands::projects::projects_inspect_folder,
             commands::projects::projects_set_pinned,
             commands::projects::projects_removal_preview,
             commands::projects::projects_unregister,
@@ -99,6 +102,9 @@ pub fn run() {
             commands::secrets::secrets_reveal,
             commands::secrets::secrets_copy,
             commands::secrets::secrets_delete,
+            commands::generator::password_generate,
+            commands::generator::password_copy,
+            commands::export::data_export,
             commands::updates::update_prefs_get,
             commands::updates::update_prefs_set,
             commands::updates::update_check,

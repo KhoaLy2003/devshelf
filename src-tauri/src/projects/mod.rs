@@ -1,7 +1,7 @@
 //! Project registry: validation, path normalisation, persistence, and pinning.
 //!
-//! Project folders are only checked for existence and type; nothing is read or
-//! written inside them.
+//! Project folders are only checked for existence and type. `inspect_folder` reads top-level
+//! marker files and `package.json` to suggest a type and tags; nothing is written inside them.
 
 use rusqlite::{params, Connection, OptionalExtension};
 
@@ -470,6 +470,234 @@ pub fn unregister(storage: &Storage, id: i64) -> Result<RemovalCounts, RemovalEr
     tx.execute("DELETE FROM projects WHERE id = ?1", [id]).map_err(removal_storage_failure)?;
     tx.commit().map_err(removal_storage_failure)?;
     Ok(RemovalCounts { configs, workspaces })
+}
+
+/// What a folder's top-level marker files suggest. Suggestions only; the user can edit them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FolderSuggestion {
+    pub name: String,
+    pub project_type: Option<&'static str>,
+    pub tags: Vec<String>,
+}
+
+const MAX_MARKER_BYTES: u64 = 1024 * 1024;
+const DOCKER_MARKERS: [&str; 5] = [
+    "Dockerfile",
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    "compose.yml",
+    "compose.yaml",
+];
+
+/// Reads only direct children of the folder: never recurses and never writes. A missing or
+/// unreadable file counts as absent.
+pub fn inspect_folder(path: &ValidatedPath) -> FolderSuggestion {
+    let (project_type, tags) = detect(std::path::Path::new(path.as_str()));
+    FolderSuggestion {
+        name: folder_name(path.as_str()),
+        project_type,
+        tags: tags.into_iter().map(str::to_string).collect(),
+    }
+}
+
+/// First match wins: Spring Boot, then Node/React, then Docker/Infra.
+fn detect(root: &std::path::Path) -> (Option<&'static str>, Vec<&'static str>) {
+    if let Some(build) = spring_boot_build(root) {
+        return (Some("Spring Boot"), vec!["java", build]);
+    }
+    if root.join("package.json").is_file() {
+        let language = if root.join("tsconfig.json").is_file() {
+            "typescript"
+        } else {
+            "javascript"
+        };
+        return if package_depends_on_react(root) {
+            (Some("React"), vec!["react", language])
+        } else {
+            (Some("Node"), vec!["node", language])
+        };
+    }
+    if DOCKER_MARKERS.iter().any(|m| root.join(m).is_file()) {
+        return (Some("Docker/Infra"), vec!["docker"]);
+    }
+    (None, Vec::new())
+}
+
+/// `pom.xml` is checked before the Gradle scripts.
+fn spring_boot_build(root: &std::path::Path) -> Option<&'static str> {
+    if mentions_spring_boot(&root.join("pom.xml")) {
+        return Some("maven");
+    }
+    for name in ["build.gradle", "build.gradle.kts"] {
+        if mentions_spring_boot(&root.join(name)) {
+            return Some("gradle");
+        }
+    }
+    None
+}
+
+/// `spring-boot` matches artifact ids; `org.springframework.boot` matches the Gradle plugin id and group ids.
+fn mentions_spring_boot(path: &std::path::Path) -> bool {
+    file_mentions(path, "spring-boot") || file_mentions(path, "org.springframework.boot")
+}
+
+fn file_mentions(path: &std::path::Path, needle: &str) -> bool {
+    let small_file = std::fs::metadata(path)
+        .map(|m| m.is_file() && m.len() <= MAX_MARKER_BYTES)
+        .unwrap_or(false);
+    small_file
+        && std::fs::read_to_string(path)
+            .map(|text| text.contains(needle))
+            .unwrap_or(false)
+}
+
+/// False when `package.json` is missing, too large, or not JSON; the caller then says Node.
+fn package_depends_on_react(root: &std::path::Path) -> bool {
+    let path = root.join("package.json");
+    if !file_mentions(&path, "\"react\"") {
+        return false;
+    }
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return false;
+    };
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return false;
+    };
+    ["dependencies", "devDependencies"]
+        .iter()
+        .any(|key| json.get(key).and_then(|deps| deps.get("react")).is_some())
+}
+
+/// Last non-empty `\` segment: `F:\a\b\` gives `b`, `F:\` gives `F:`, `\\srv\share\x` gives `x`.
+fn folder_name(normalized: &str) -> String {
+    let last = normalized.rsplit('\\').find(|s| !s.is_empty()).unwrap_or("");
+    last.chars().take(MAX_NAME_CHARS).collect()
+}
+
+#[cfg(test)]
+mod folder_inspection_tests {
+    use super::*;
+    use std::path::Path;
+
+    fn write(dir: &Path, name: &str, text: &str) {
+        std::fs::write(dir.join(name), text).unwrap();
+    }
+
+    fn inspect(dir: &Path) -> FolderSuggestion {
+        let validated = validate_path(&dir.to_string_lossy()).unwrap();
+        inspect_folder(&validated)
+    }
+
+    fn make_dir(parent: &Path, name: &str) -> std::path::PathBuf {
+        let dir = parent.join(name);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn spring_boot_pom_gives_maven_tags() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = make_dir(tmp.path(), "api");
+        write(&dir, "pom.xml", "<artifactId>spring-boot-starter-web</artifactId>");
+        let s = inspect(&dir);
+        assert_eq!(s.project_type, Some("Spring Boot"));
+        assert_eq!(s.tags, ["java", "maven"]);
+        assert_eq!(s.name, "api");
+    }
+
+    #[test]
+    fn gradle_kotlin_script_gives_gradle_tags() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = make_dir(tmp.path(), "svc");
+        write(&dir, "build.gradle.kts", r#"plugins { id("org.springframework.boot") version "3" }"#);
+        let s = inspect(&dir);
+        assert_eq!(s.project_type, Some("Spring Boot"));
+        assert_eq!(s.tags, ["java", "gradle"]);
+    }
+
+    #[test]
+    fn pom_without_spring_boot_with_dockerfile_is_docker() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = make_dir(tmp.path(), "plain");
+        write(&dir, "pom.xml", "<artifactId>plain-lib</artifactId>");
+        write(&dir, "Dockerfile", "FROM scratch");
+        let s = inspect(&dir);
+        assert_eq!(s.project_type, Some("Docker/Infra"));
+        assert_eq!(s.tags, ["docker"]);
+    }
+
+    #[test]
+    fn react_dev_dependency_with_tsconfig_gives_react_typescript() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = make_dir(tmp.path(), "web");
+        write(&dir, "package.json", r#"{"devDependencies":{"react":"^18.0.0"}}"#);
+        write(&dir, "tsconfig.json", "{}");
+        let s = inspect(&dir);
+        assert_eq!(s.project_type, Some("React"));
+        assert_eq!(s.tags, ["react", "typescript"]);
+    }
+
+    #[test]
+    fn empty_package_json_is_node_javascript() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = make_dir(tmp.path(), "tool");
+        write(&dir, "package.json", "{}");
+        let s = inspect(&dir);
+        assert_eq!(s.project_type, Some("Node"));
+        assert_eq!(s.tags, ["node", "javascript"]);
+    }
+
+    #[test]
+    fn unparsable_package_json_is_node() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = make_dir(tmp.path(), "broken");
+        write(&dir, "package.json", "not json react");
+        assert_eq!(inspect(&dir).project_type, Some("Node"));
+    }
+
+    #[test]
+    fn spring_boot_takes_precedence_over_package_json() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = make_dir(tmp.path(), "mixed");
+        write(&dir, "pom.xml", "spring-boot");
+        write(&dir, "package.json", r#"{"dependencies":{"react":"1"}}"#);
+        assert_eq!(inspect(&dir).project_type, Some("Spring Boot"));
+    }
+
+    #[test]
+    fn empty_folder_has_no_suggestion() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = make_dir(tmp.path(), "empty");
+        let s = inspect(&dir);
+        assert_eq!(s.project_type, None);
+        assert!(s.tags.is_empty());
+    }
+
+    #[test]
+    fn folder_name_is_last_segment() {
+        assert_eq!(folder_name("F:\\a\\b"), "b");
+        assert_eq!(folder_name("F:\\a\\b\\"), "b");
+        assert_eq!(folder_name("F:\\"), "F:");
+        assert_eq!(folder_name("\\\\srv\\share\\x"), "x");
+    }
+
+    #[test]
+    fn inspection_leaves_folder_contents_unchanged() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = make_dir(tmp.path(), "kept");
+        write(&dir, "package.json", r#"{"devDependencies":{"react":"1"}}"#);
+        write(&dir, "tsconfig.json", "{}");
+        let before = std::fs::metadata(dir.join("package.json")).unwrap().modified().unwrap();
+        inspect(&dir);
+        let after = std::fs::metadata(dir.join("package.json")).unwrap().modified().unwrap();
+        assert_eq!(before, after);
+        let mut names: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["package.json", "tsconfig.json"]);
+    }
 }
 
 #[cfg(test)]

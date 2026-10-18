@@ -244,6 +244,22 @@ fn verify_password(
     Ok(key)
 }
 
+/// Checks the master password without changing the session. `Ok(None)` when no vault exists yet:
+/// nothing is protected, so no password is needed. The plaintext export uses this so that it does
+/// not unlock the vault as a side effect.
+pub fn verified_key(
+    storage: &Mutex<Storage>,
+    password: &str,
+) -> Result<Option<Zeroizing<[u8; kdf::KEY_LEN]>>, VaultError> {
+    let Some(meta) = read_meta(storage)? else {
+        return Ok(None);
+    };
+    if password.is_empty() {
+        return Err(VaultError::new(VaultCode::PasswordRequired));
+    }
+    verify_password(&meta, password).map(Some)
+}
+
 /// Number of secrets a vault delete would remove. `NotSetUp` when there is no vault.
 pub fn delete_preview(storage: &Mutex<Storage>) -> Result<i64, VaultError> {
     if read_meta(storage)?.is_none() {
@@ -719,5 +735,39 @@ mod tests {
         assert_eq!(err(delete(&f.storage, &f.session, PW)), VaultCode::StorageUnavailable);
         assert_eq!(secret_count(&f), 1);
         assert_eq!(meta_rows(&f), 1);
+    }
+
+    #[test]
+    fn verified_key_matches_the_key_the_session_unlocks_with() {
+        let f = fixture();
+        set_up(&f);
+        let verified = verified_key(&f.storage, PW).unwrap().unwrap();
+        f.session.lock();
+        unlock(&f.storage, &f.session, PW).unwrap();
+        let session_key = with_key(&f.session, |k| *k).unwrap();
+        assert_eq!(*verified, session_key);
+    }
+
+    #[test]
+    fn verified_key_wrong_password_is_rejected_and_session_stays_locked() {
+        let f = fixture();
+        set_up(&f);
+        f.session.lock();
+        let err = verified_key(&f.storage, "wrong password").unwrap_err();
+        assert_eq!(err.code, VaultCode::WrongPassword);
+        assert!(with_key(&f.session, |_| ()).is_err());
+    }
+
+    #[test]
+    fn verified_key_empty_password_is_required() {
+        let f = fixture();
+        set_up(&f);
+        assert_eq!(verified_key(&f.storage, "").unwrap_err().code, VaultCode::PasswordRequired);
+    }
+
+    #[test]
+    fn verified_key_without_a_vault_needs_no_password() {
+        let f = fixture();
+        assert!(verified_key(&f.storage, "").unwrap().is_none());
     }
 }

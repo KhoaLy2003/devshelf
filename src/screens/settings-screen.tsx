@@ -3,6 +3,7 @@ import { useState } from "react";
 import { EditorOpenTest } from "../components/editor-open-test";
 import { EditorProfilesSection } from "../components/editor-profiles-section";
 import { UpdatesSection } from "../components/updates-section";
+import { ExportDataDialog } from "../components/export-data-dialog";
 import { storageStatus } from "../lib/commands";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
 
@@ -43,6 +44,24 @@ function AppearanceSection() {
   );
 }
 
+function ExportSection() {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="mb-6 rounded-2xl border border-hairline bg-surface p-5">
+      <h2 className="m-0 mb-3 text-xl font-semibold">Export data</h2>
+      <p className="m-0 mb-3 text-ink-muted">Save all your data as CSV files.</p>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="rounded-lg border border-hairline bg-surface-raised px-4 py-2 text-ink hover:border-ink-muted focus-visible:outline-2 focus-visible:outline-accent"
+      >
+        Export…
+      </button>
+      {open ? <ExportDataDialog onClose={() => setOpen(false)} /> : null}
+    </section>
+  );
+}
+
 export function SettingsScreen() {
   const status = useQuery({ queryKey: ["storage-status"], queryFn: storageStatus });
   const data = status.data;
@@ -54,6 +73,7 @@ export function SettingsScreen() {
       <UpdatesSection />
       <EditorProfilesSection />
       <EditorOpenTest />
+      <ExportSection />
       {data?.ok ? (
         <section className="mb-6 rounded-2xl border border-hairline bg-surface p-5">
           <p className="m-0 mb-1 font-medium">Storage: OK</p>

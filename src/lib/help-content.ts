@@ -107,6 +107,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
       "Secrets and note bodies are encrypted.",
       "Plaintext secrets are sent to the screen only when you explicitly reveal or copy them.",
       "Project names, labels, environment names, and file paths are stored unencrypted in the local database.",
+      "Export data (Settings) writes your notes and secret values as unencrypted CSV files; protect or delete them.",
     ],
   },
   {

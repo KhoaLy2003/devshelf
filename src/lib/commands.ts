@@ -97,6 +97,14 @@ import type {
   UpdatePrefsGetArgs,
   UpdatePrefsResult,
   UpdatePrefsSetArgs,
+  PasswordGenerateArgs,
+  PasswordGenerateResult,
+  PasswordCopyArgs,
+  PasswordCopyResult,
+  ProjectInspectFolderArgs,
+  ProjectInspectFolderResult,
+  DataExportArgs,
+  DataExportResult,
 } from "../types/commands";
 
 export function appInfo(): Promise<AppInfo> {
@@ -380,4 +388,27 @@ export function checkForUpdate(): Promise<UpdateCheckResult> {
 export function installUpdate(): Promise<UpdateInstallResult> {
   const args: UpdateInstallArgs = {};
   return invoke<UpdateInstallResult>("update_install", { args });
+}
+
+export function generatePassword(
+  length: number,
+  includeSymbols: boolean,
+): Promise<PasswordGenerateResult> {
+  const args: PasswordGenerateArgs = { length, include_symbols: includeSymbols };
+  return invoke<PasswordGenerateResult>("password_generate", { args });
+}
+
+export function copyPassword(value: string): Promise<PasswordCopyResult> {
+  const args: PasswordCopyArgs = { value };
+  return invoke<PasswordCopyResult>("password_copy", { args });
+}
+
+export function inspectProjectFolder(rootPath: string): Promise<ProjectInspectFolderResult> {
+  const args: ProjectInspectFolderArgs = { root_path: rootPath };
+  return invoke<ProjectInspectFolderResult>("projects_inspect_folder", { args });
+}
+
+export function exportData(password: string, acknowledged: boolean): Promise<DataExportResult> {
+  const args: DataExportArgs = { password, acknowledged };
+  return invoke<DataExportResult>("data_export", { args });
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { formatProjectError } from "../src/lib/project-form";
+import { applySuggestion, formatProjectError } from "../src/lib/project-form";
+import type { ProjectInspectFolderResult } from "../src/types/commands";
 
 describe("formatProjectError", () => {
   const path = "F:\\work\\app";
@@ -71,5 +72,60 @@ describe("formatProjectError", () => {
   it("type_invalid and storage_unavailable return non-empty copy", () => {
     expect(formatProjectError("type_invalid", null, path)).not.toBe("");
     expect(formatProjectError("storage_unavailable", null, path)).not.toBe("");
+  });
+});
+
+describe("applySuggestion", () => {
+  const blank = { name: "", type: "Other" as const, tags: "" };
+  const nothingTouched = { name: false, type: false, tags: false };
+
+  it("fills every untouched field from the folder", () => {
+    const s: ProjectInspectFolderResult = {
+      name: "api",
+      project_type: "Spring Boot",
+      tags: ["java", "maven"],
+      error: null,
+    };
+    expect(applySuggestion(blank, nothingTouched, s)).toEqual({
+      name: "api",
+      type: "Spring Boot",
+      tags: "java, maven",
+    });
+  });
+
+  it("keeps a touched name while filling type and tags", () => {
+    const s: ProjectInspectFolderResult = {
+      name: "web",
+      project_type: "React",
+      tags: ["react", "typescript"],
+      error: null,
+    };
+    const current = { name: "Mine", type: "Other" as const, tags: "" };
+    expect(applySuggestion(current, { ...nothingTouched, name: true }, s)).toEqual({
+      name: "Mine",
+      type: "React",
+      tags: "react, typescript",
+    });
+  });
+
+  it("resets an untouched type to Other when the folder has no type", () => {
+    const s: ProjectInspectFolderResult = { name: null, project_type: null, tags: [], error: null };
+    const current = { name: "old", type: "Node" as const, tags: "node" };
+    expect(applySuggestion(current, nothingTouched, s)).toEqual({
+      name: "old",
+      type: "Other",
+      tags: "",
+    });
+  });
+
+  it("leaves the form unchanged when inspection reports an error", () => {
+    const s: ProjectInspectFolderResult = {
+      name: null,
+      project_type: null,
+      tags: [],
+      error: "path_not_found",
+    };
+    const current = { name: "keep", type: "Node" as const, tags: "node" };
+    expect(applySuggestion(current, nothingTouched, s)).toBe(current);
   });
 });
