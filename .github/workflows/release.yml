@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   verify-tag:
     runs-on: windows-latest
@@ -33,3 +37,48 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm run test
+
+  build:
+    needs: verify-tag
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test
+      - name: Read CHANGELOG notes for this tag
+        id: notes
+        shell: bash
+        run: |
+          {
+            echo "body<<NOTES_EOF"
+            node --input-type=module -e "import { readChangelogSection } from './scripts/release-lib.mjs'; console.log(readChangelogSection(process.env.GITHUB_REF_NAME.replace(/^v/, '')));"
+            echo "NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+      - name: Build signed installer and updater metadata
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: DevShelf ${{ github.ref_name }}
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: true
+          prerelease: false
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+          args: --bundles nsis

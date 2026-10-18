@@ -90,6 +90,13 @@ import type {
   VaultStatusResult,
   VaultTouchArgs,
   VaultUnlockArgs,
+  UpdateCheckArgs,
+  UpdateCheckResult,
+  UpdateInstallArgs,
+  UpdateInstallResult,
+  UpdatePrefsGetArgs,
+  UpdatePrefsResult,
+  UpdatePrefsSetArgs,
 } from "../types/commands";
 
 export function appInfo(): Promise<AppInfo> {
@@ -353,4 +360,24 @@ export function secretsCopy(id: number): Promise<SecretCopyResult> {
 export function secretsDelete(id: number): Promise<SecretDeleteResult> {
   const args: SecretIdArgs = { id };
   return invoke<SecretDeleteResult>("secrets_delete", { args });
+}
+
+export function getUpdatePrefs(): Promise<UpdatePrefsResult> {
+  const args: UpdatePrefsGetArgs = {};
+  return invoke<UpdatePrefsResult>("update_prefs_get", { args });
+}
+
+export function setUpdatePrefs(autoCheck: boolean): Promise<UpdatePrefsResult> {
+  const args: UpdatePrefsSetArgs = { auto_check: autoCheck };
+  return invoke<UpdatePrefsResult>("update_prefs_set", { args });
+}
+
+export function checkForUpdate(): Promise<UpdateCheckResult> {
+  const args: UpdateCheckArgs = {};
+  return invoke<UpdateCheckResult>("update_check", { args });
+}
+
+export function installUpdate(): Promise<UpdateInstallResult> {
+  const args: UpdateInstallArgs = {};
+  return invoke<UpdateInstallResult>("update_install", { args });
 }

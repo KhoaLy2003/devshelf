@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { EditorOpenTest } from "../components/editor-open-test";
 import { EditorProfilesSection } from "../components/editor-profiles-section";
+import { UpdatesSection } from "../components/updates-section";
 import { storageStatus } from "../lib/commands";
 import { getTheme, setTheme, type Theme } from "../lib/theme";
 
@@ -50,6 +51,7 @@ export function SettingsScreen() {
     <div>
       <h1 className="m-0 mb-8 text-3xl font-semibold">Settings</h1>
       <AppearanceSection />
+      <UpdatesSection />
       <EditorProfilesSection />
       <EditorOpenTest />
       {data?.ok ? (
@@ -59,8 +61,9 @@ export function SettingsScreen() {
         </section>
       ) : null}
       <p className="m-0 max-w-[60ch] text-ink-muted">
-        DevShelf stores all data on this computer. Nothing is sent over the network. Project names,
-        labels, environment names, and file paths are stored unencrypted in the local database.
+        DevShelf stores all data on this computer. DevShelf only uses the network to check GitHub
+        for updates. No data about you or your projects is sent. Project names, labels, environment
+        names, and file paths are stored unencrypted in the local database.
       </p>
     </div>
   );

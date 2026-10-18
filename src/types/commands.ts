@@ -700,3 +700,37 @@ export interface VaultDeleteResult {
   error: VaultDeleteCode | null;
   detail: string | null;
 }
+
+// Update preferences, check, and install. Contract shared by Rust (commands/updates.rs) and UI.
+
+export type UpdateErrorCode =
+  "storage_unavailable" | "check_failed" | "install_failed" | "nothing_pending";
+
+export type UpdatePrefsGetArgs = Record<string, never>;
+
+export interface UpdatePrefsSetArgs {
+  auto_check: boolean;
+}
+
+export interface UpdatePrefsResult {
+  auto_check: boolean;
+  error: UpdateErrorCode | null;
+}
+
+export type UpdateCheckArgs = Record<string, never>;
+
+export interface UpdateView {
+  version: string;
+  notes: string | null;
+}
+
+export interface UpdateCheckResult {
+  update: UpdateView | null;
+  error: UpdateErrorCode | null;
+}
+
+export type UpdateInstallArgs = Record<string, never>;
+
+export interface UpdateInstallResult {
+  error: UpdateErrorCode | null;
+}

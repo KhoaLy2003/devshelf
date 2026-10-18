@@ -1,6 +1,7 @@
 import { Outlet } from "react-router";
 import { formatCountdown } from "../lib/vault-form";
 import { useVaultShell } from "../lib/use-vault-shell";
+import { UpdateBanner } from "./update-banner";
 import { Sidebar } from "./sidebar";
 
 export function AppShell() {
@@ -9,6 +10,7 @@ export function AppShell() {
     <div className="grid h-full grid-cols-[248px_1fr] bg-canvas text-ink">
       <Sidebar />
       <main className="min-w-0 overflow-y-auto px-10 py-8">
+        <UpdateBanner />
         {secondsUntilLock !== null ? (
           <p
             role="status"

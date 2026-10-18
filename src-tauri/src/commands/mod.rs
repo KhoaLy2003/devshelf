@@ -6,6 +6,7 @@ pub mod projects;
 pub mod secrets;
 pub mod storage;
 pub mod vault;
+pub mod updates;
 pub mod workspaces;
 
 use serde::{Deserialize, Serialize};

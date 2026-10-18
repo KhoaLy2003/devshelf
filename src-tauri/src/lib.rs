@@ -1,3 +1,5 @@
+use std::sync::Mutex;
+
 use tauri::Manager;
 
 mod commands;
@@ -8,6 +10,7 @@ mod notes;
 mod projects;
 mod secrets;
 mod vault;
+mod updates;
 mod workspaces;
 
 pub fn run() {
@@ -21,6 +24,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let folder = app.path().app_data_dir().unwrap_or_default();
             app.manage(commands::storage::StorageState::open(folder));
@@ -28,6 +32,7 @@ pub fn run() {
                 notes::CredentialKeyStore,
             )));
             app.manage(vault::VaultSession::new());
+            app.manage(commands::updates::PendingUpdate(Mutex::new(None)));
             app.manage(commands::secrets::SecretClipboard(Box::new(
                 secrets::SystemClipboard,
             )));
@@ -93,7 +98,11 @@ pub fn run() {
             commands::secrets::secrets_update,
             commands::secrets::secrets_reveal,
             commands::secrets::secrets_copy,
-            commands::secrets::secrets_delete
+            commands::secrets::secrets_delete,
+            commands::updates::update_prefs_get,
+            commands::updates::update_prefs_set,
+            commands::updates::update_check,
+            commands::updates::update_install
         ])
         .run(tauri::generate_context!())
         .expect("error while running DevShelf");
