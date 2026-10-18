@@ -435,6 +435,75 @@ pub fn delete_all(conn: &rusqlite::Connection) -> Result<i64, SecretError> {
     conn.execute("DELETE FROM secrets", []).map(|n| n as i64).map_err(storage_err)
 }
 
+/// A secret with its value decrypted, for the plaintext export only. No `Debug`: it holds the value.
+pub struct ExportedSecret {
+    pub id: i64,
+    pub label: String,
+    pub secret_type: String,
+    pub project_id: Option<i64>,
+    pub environment: String,
+    pub value: Zeroizing<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+struct RawSecret {
+    id: i64,
+    label: String,
+    secret_type: String,
+    project_id: Option<i64>,
+    environment: String,
+    created_at: String,
+    updated_at: String,
+    blob: Vec<u8>,
+}
+
+/// Decrypts every secret in id order. A row that fails to decrypt or is not UTF-8 aborts the
+/// whole export, so no partial plaintext backup is produced.
+pub fn export_all(storage: &Storage, key: &[u8; 32]) -> Result<Vec<ExportedSecret>, SecretError> {
+    let mut stmt = storage
+        .connection()
+        .prepare(
+            "SELECT id, label, secret_type, project_id, environment, created_at, updated_at, body_enc \
+             FROM secrets ORDER BY id",
+        )
+        .map_err(storage_err)?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(RawSecret {
+                id: r.get(0)?,
+                label: r.get(1)?,
+                secret_type: r.get(2)?,
+                project_id: r.get(3)?,
+                environment: r.get(4)?,
+                created_at: r.get(5)?,
+                updated_at: r.get(6)?,
+                blob: r.get(7)?,
+            })
+        })
+        .map_err(storage_err)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(storage_err)?;
+    let mut out = Vec::with_capacity(rows.len());
+    for raw in rows {
+        let plain = crypto::decrypt(key, raw.id, &raw.blob)
+            .map_err(|_| SecretError::new(SecretCode::Unreadable))?;
+        let value = String::from_utf8(plain.to_vec())
+            .map_err(|_| SecretError::new(SecretCode::Unreadable))?;
+        out.push(ExportedSecret {
+            id: raw.id,
+            label: raw.label,
+            secret_type: raw.secret_type,
+            project_id: raw.project_id,
+            environment: raw.environment,
+            value: Zeroizing::new(value),
+            created_at: raw.created_at,
+            updated_at: raw.updated_at,
+        });
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

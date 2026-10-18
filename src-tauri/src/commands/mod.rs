@@ -4,6 +4,8 @@ pub mod home;
 pub mod notes;
 pub mod projects;
 pub mod secrets;
+pub mod generator;
+pub mod export;
 pub mod storage;
 pub mod vault;
 pub mod updates;

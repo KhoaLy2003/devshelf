@@ -1,4 +1,4 @@
-import type { ProjectErrorCode } from "../types/commands";
+import type { ProjectErrorCode, ProjectInspectFolderResult, ProjectType } from "../types/commands";
 
 // `detail` is the existing name or invalid tag from Rust; `path` is the form's path.
 export function formatProjectError(
@@ -32,4 +32,32 @@ export function formatProjectError(
     case "storage_unavailable":
       return "DevShelf cannot reach its data folder. Restart DevShelf and try again.";
   }
+}
+
+export interface FormFields {
+  name: string;
+  type: ProjectType;
+  tags: string;
+}
+
+export interface TouchedFields {
+  name: boolean;
+  type: boolean;
+  tags: boolean;
+}
+
+/** Fills the fields the user has not edited. A failed inspection leaves the form unchanged. */
+export function applySuggestion(
+  current: FormFields,
+  touched: TouchedFields,
+  s: ProjectInspectFolderResult,
+): FormFields {
+  if (s.error !== null) {
+    return current;
+  }
+  return {
+    name: touched.name ? current.name : (s.name ?? current.name),
+    type: touched.type ? current.type : (s.project_type ?? "Other"),
+    tags: touched.tags ? current.tags : s.tags.join(", "),
+  };
 }

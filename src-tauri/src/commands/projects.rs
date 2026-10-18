@@ -256,6 +256,41 @@ pub fn projects_check_path(
     check_path_result(with_storage(&state, |s| projects::nested_note(s, &normalized)))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ProjectInspectFolderArgs {
+    pub root_path: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProjectInspectFolderResult {
+    pub name: Option<String>,
+    pub project_type: Option<String>,
+    pub tags: Vec<String>,
+    pub error: Option<ProjectErrorCode>,
+}
+
+/// Reads the folder's top-level marker files only. Runs off the main thread.
+#[tauri::command(async)]
+pub fn projects_inspect_folder(args: ProjectInspectFolderArgs) -> ProjectInspectFolderResult {
+    match projects::validate_path(&args.root_path) {
+        Err(e) => ProjectInspectFolderResult {
+            name: None,
+            project_type: None,
+            tags: Vec::new(),
+            error: Some(e.code.into()),
+        },
+        Ok(path) => {
+            let suggestion = projects::inspect_folder(&path);
+            ProjectInspectFolderResult {
+                name: Some(suggestion.name).filter(|n| !n.is_empty()),
+                project_type: suggestion.project_type.map(str::to_string),
+                tags: suggestion.tags,
+                error: None,
+            }
+        }
+    }
+}
+
 #[tauri::command]
 pub fn projects_set_pinned(
     args: ProjectSetPinnedArgs,

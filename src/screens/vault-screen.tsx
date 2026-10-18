@@ -5,6 +5,7 @@ import { VAULT_STATUS_KEY, useVaultStatusQuery } from "../lib/use-vault-shell";
 import { formatVaultError, lockReasonText, validateSetup } from "../lib/vault-form";
 import type { VaultCode, VaultStatusResult, VaultStatusView } from "../types/commands";
 import { DeleteVaultDialog } from "../components/delete-vault-dialog";
+import { PasswordGenerator } from "../components/password-generator";
 
 const AUTO_LOCK_OPTIONS = [
   { value: 0, label: "Never" },
@@ -26,6 +27,7 @@ function SetupView({ onDone }: { onDone: (result: VaultStatusResult) => void }) 
   const [acknowledged, setAcknowledged] = useState(false);
   const [error, setError] = useState<VaultCode | null>(null);
   const [busy, setBusy] = useState(false);
+  const [show, setShow] = useState(false);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -58,26 +60,45 @@ function SetupView({ onDone }: { onDone: (result: VaultStatusResult) => void }) 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
       <p className="m-0 text-ink-muted">Choose a master password to protect your vault.</p>
-      <label className="flex flex-col gap-1">
-        <span>Master password</span>
-        <input
-          type="password"
-          autoComplete="new-password"
-          className={inputClass}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </label>
+      <div className="flex items-end gap-2">
+        <label className="flex flex-col gap-1">
+          <span>Master password</span>
+          <input
+            type={show ? "text" : "password"}
+            autoComplete="new-password"
+            className={inputClass}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          className={buttonSecondary}
+          aria-pressed={show}
+          onClick={() => setShow((v) => !v)}
+        >
+          {show ? "Hide" : "Show"}
+        </button>
+      </div>
       <label className="flex flex-col gap-1">
         <span>Confirm master password</span>
         <input
-          type="password"
+          type={show ? "text" : "password"}
           autoComplete="new-password"
           className={inputClass}
           value={confirmation}
           onChange={(e) => setConfirmation(e.target.value)}
         />
       </label>
+      <PasswordGenerator
+        value={password}
+        disabled={busy}
+        onGenerated={(generated) => {
+          setPassword(generated);
+          setConfirmation(generated);
+          setShow(true);
+        }}
+      />
       <p className="m-0 text-warning">
         If you forget this password, the vault cannot be opened. There is no reset.
       </p>

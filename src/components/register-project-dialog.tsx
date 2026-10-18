@@ -1,12 +1,23 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { checkProjectPath, pickProjectFolder, registerProject } from "../lib/commands";
-import { formatProjectError } from "../lib/project-form";
+import {
+  checkProjectPath,
+  inspectProjectFolder,
+  pickProjectFolder,
+  registerProject,
+} from "../lib/commands";
+import {
+  applySuggestion,
+  formatProjectError,
+  type FormFields,
+  type TouchedFields,
+} from "../lib/project-form";
 import {
   PROJECT_TYPES,
   type ProjectErrorCode,
   type ProjectType,
   type ProjectView,
+  type ProjectInspectFolderResult,
 } from "../types/commands";
 
 type Field = "path" | "name" | "type" | "tags" | "form";
@@ -58,9 +69,11 @@ export function RegisterProjectDialog({ onClose, onRegistered }: RegisterProject
   const queryClient = useQueryClient();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [path, setPath] = useState("");
-  const [name, setName] = useState("");
-  const [type, setType] = useState<ProjectType>("Other");
-  const [tags, setTags] = useState("");
+  const [fields, setFields] = useState<FormFields>({ name: "", type: "Other", tags: "" });
+  const { name, type, tags } = fields;
+  const touchedRef = useRef<TouchedFields>({ name: false, type: false, tags: false });
+  const lastInspected = useRef("");
+  const [autofilled, setAutofilled] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [nestedIn, setNestedIn] = useState<string | null>(null);
   const pathRef = useRef("");
@@ -77,6 +90,7 @@ export function RegisterProjectDialog({ onClose, onRegistered }: RegisterProject
     pathRef.current = value;
     setPath(value);
     setNestedIn(null);
+    setAutofilled(false);
   };
 
   const checkPath = async (value: string) => {
@@ -96,6 +110,32 @@ export function RegisterProjectDialog({ onClose, onRegistered }: RegisterProject
     }
   };
 
+  const editField = <K extends keyof FormFields>(key: K, value: FormFields[K]) => {
+    touchedRef.current = { ...touchedRef.current, [key]: true };
+    setFields((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // Fills only the fields the user has not edited. A result for a path that changed meanwhile is dropped.
+  const inspect = async (value: string) => {
+    if (value.trim() === "" || value === lastInspected.current) {
+      return;
+    }
+    lastInspected.current = value;
+    let result: ProjectInspectFolderResult;
+    try {
+      result = await inspectProjectFolder(value);
+    } catch {
+      return;
+    }
+    if (pathRef.current !== value) {
+      return;
+    }
+    setFields((prev) => applySuggestion(prev, touchedRef.current, result));
+    if (result.error === null) {
+      setAutofilled(true);
+    }
+  };
+
   const browse = async () => {
     try {
       const result = await pickProjectFolder();
@@ -103,6 +143,7 @@ export function RegisterProjectDialog({ onClose, onRegistered }: RegisterProject
         updatePath(result.path);
         setErrors((prev) => ({ ...prev, path: undefined }));
         await checkPath(result.path);
+        await inspect(result.path);
       }
     } catch {
       setErrors((prev) => ({
@@ -171,7 +212,10 @@ export function RegisterProjectDialog({ onClose, onRegistered }: RegisterProject
               autoFocus
               value={path}
               onChange={(event) => updatePath(event.target.value)}
-              onBlur={() => void checkPath(path)}
+              onBlur={() => {
+                void checkPath(path);
+                void inspect(path);
+              }}
               placeholder="D:\work\my-project"
               aria-invalid={errors.path !== undefined}
               aria-describedby={pathDescribedBy}
@@ -196,7 +240,7 @@ export function RegisterProjectDialog({ onClose, onRegistered }: RegisterProject
           <input
             id="rp-name"
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => editField("name", event.target.value)}
             placeholder="notify-worker"
             aria-invalid={errors.name !== undefined}
             aria-describedby={errors.name !== undefined ? "rp-name-error" : undefined}
@@ -212,7 +256,7 @@ export function RegisterProjectDialog({ onClose, onRegistered }: RegisterProject
           <select
             id="rp-type"
             value={type}
-            onChange={(event) => setType(event.target.value as ProjectType)}
+            onChange={(event) => editField("type", event.target.value as ProjectType)}
             aria-invalid={errors.type !== undefined}
             aria-describedby={errors.type !== undefined ? "rp-type-error" : undefined}
             className={`${inputClass} ${errors.type ? "border-warning" : "border-hairline"}`}
@@ -233,13 +277,18 @@ export function RegisterProjectDialog({ onClose, onRegistered }: RegisterProject
           <input
             id="rp-tags"
             value={tags}
-            onChange={(event) => setTags(event.target.value)}
+            onChange={(event) => editField("tags", event.target.value)}
             placeholder="api, backend"
             aria-invalid={errors.tags !== undefined}
             aria-describedby={errors.tags !== undefined ? "rp-tags-error" : undefined}
             className={`${inputClass} ${errors.tags ? "border-warning" : "border-hairline"}`}
           />
           <FieldError id="rp-tags-error" message={errors.tags} />
+          {autofilled ? (
+            <p id="rp-autofill-note" className="m-0 mt-1 text-sm text-ink-muted">
+              Filled in from the folder. Change anything that is wrong.
+            </p>
+          ) : null}
         </div>
 
         <FieldError id="rp-form-error" message={errors.form} />

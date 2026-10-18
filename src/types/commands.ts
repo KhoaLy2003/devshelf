@@ -91,6 +91,17 @@ export interface ProjectCheckPathResult {
   error: ProjectErrorCode | null;
 }
 
+export interface ProjectInspectFolderArgs {
+  root_path: string;
+}
+
+export interface ProjectInspectFolderResult {
+  name: string | null;
+  project_type: ProjectType | null;
+  tags: string[];
+  error: ProjectErrorCode | null;
+}
+
 export interface ProjectSetPinnedArgs {
   id: number;
   pinned: boolean;
@@ -733,4 +744,53 @@ export type UpdateInstallArgs = Record<string, never>;
 
 export interface UpdateInstallResult {
   error: UpdateErrorCode | null;
+}
+
+export type GeneratorErrorCode =
+  "generator_length_invalid" | "generator_unavailable" | "generator_copy_failed";
+
+export interface PasswordGenerateArgs {
+  length: number;
+  include_symbols: boolean;
+}
+
+export interface PasswordGenerateResult {
+  value: string | null;
+  error: GeneratorErrorCode | null;
+}
+
+export interface PasswordCopyArgs {
+  value: string;
+}
+
+export interface PasswordCopyResult {
+  error: GeneratorErrorCode | null;
+}
+
+export type ExportErrorCode =
+  | "export_ack_required"
+  | "export_password_required"
+  | "export_wrong_password"
+  | "export_secret_unreadable"
+  | "export_note_unreadable"
+  | "export_note_key_missing"
+  | "export_keyring_unavailable"
+  | "export_write_failed"
+  | "export_storage_unavailable";
+
+export interface DataExportArgs {
+  password: string;
+  acknowledged: boolean;
+}
+
+export interface ExportFileView {
+  name: string;
+  rows: number;
+}
+
+export interface DataExportResult {
+  cancelled: boolean;
+  folder: string | null;
+  files: ExportFileView[];
+  error: ExportErrorCode | null;
 }

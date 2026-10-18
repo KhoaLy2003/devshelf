@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { VaultGate } from "../components/vault-gate";
+import { PasswordGenerator } from "../components/password-generator";
 import { listProjects, secretsCreate, secretsList, secretsUpdate } from "../lib/commands";
 import {
   SECRET_ENVIRONMENT_OPTIONS,
@@ -50,6 +51,7 @@ function SecretEditor({ existing }: EditorProps) {
   const [value, setValue] = useState("");
   const [error, setError] = useState<SecretCode | null>(null);
   const [busy, setBusy] = useState(false);
+  const [show, setShow] = useState(false);
 
   const projectsQuery = useQuery({ queryKey: ["projects"], queryFn: listProjects });
   const projects = projectsQuery.data?.projects ?? [];
@@ -197,24 +199,42 @@ function SecretEditor({ existing }: EditorProps) {
         <label htmlFor="secret-value" className="mb-1 block font-medium">
           Value
         </label>
-        <input
-          id="secret-value"
-          type="password"
-          className={fieldClass}
+        <div className="flex items-center gap-2">
+          <input
+            id="secret-value"
+            type={show ? "text" : "password"}
+            className={fieldClass}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            placeholder={isEdit ? "Leave blank to keep the current value." : undefined}
+            aria-invalid={invalid("value")}
+            aria-describedby={
+              [
+                errorField === "value" ? "secret-value-error" : null,
+                isEdit ? "secret-value-hint" : null,
+              ]
+                .filter((part) => part !== null)
+                .join(" ") || undefined
+            }
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button
+            type="button"
+            className={buttonSecondary}
+            aria-pressed={show}
+            onClick={() => setShow((v) => !v)}
+          >
+            {show ? "Hide" : "Show"}
+          </button>
+        </div>
+        <PasswordGenerator
           value={value}
-          onChange={(event) => setValue(event.target.value)}
-          placeholder={isEdit ? "Leave blank to keep the current value." : undefined}
-          aria-invalid={invalid("value")}
-          aria-describedby={
-            [
-              errorField === "value" ? "secret-value-error" : null,
-              isEdit ? "secret-value-hint" : null,
-            ]
-              .filter((part) => part !== null)
-              .join(" ") || undefined
-          }
-          autoComplete="off"
-          spellCheck={false}
+          disabled={busy}
+          onGenerated={(generated) => {
+            setValue(generated);
+            setShow(true);
+          }}
         />
         {isEdit ? (
           <p id="secret-value-hint" className="m-0 mt-1 text-sm text-ink-muted">
