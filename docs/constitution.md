@@ -4,9 +4,9 @@
 
 - **Status**: `approved`
 - **Project**: DevShelf
-- **Version**: 2.0.0
+- **Version**: 3.0.0
 - **Ratified**: 2026-10-12
-- **Last amended**: 2026-10-17
+- **Last amended**: 2026-10-18
 - **Based on**: `architecture.md`, `DESIGN.md`, `roadmap.md`
 
 > Read by every Phase 2 step. Every principle must change at least one downstream plan or diff. Personal workflow preferences do not belong here.
@@ -74,17 +74,17 @@
 
 ---
 
-### Principle 5: Local-First and Offline
+### Principle 5: Local-First with Signed Updates
 
 **MUST**:
-- No network call is made by the application. Adding one requires a Constitution amendment (MAJOR).
-- No telemetry, crash reporting, or auto-update. The app opens and works with the network disabled.
+- The only network access is the update check and download against the project's GitHub Releases (`github.com/KhoaLy2003/devshelf`), made by Rust only, at launch (user can disable in Settings > Updates) or on user request. No user data is sent. Installing an update requires user confirmation. No telemetry, no crash reporting. The app opens and works with the network disabled.
+- Updates are accepted only when signed with the project's Tauri updater key (pubkey embedded in the app).
 - Data stays in the user's application data folder. No file is written into a project repository.
 
 **SHOULD**:
 - Errors that a user can fix (missing path, missing editor) show the fix in the message, not a generic failure.
 
-**Rationale**: Single user, offline product (idea brief no-go list). Network code would add a dependency the product does not need.
+**Rationale**: Single user, local-first product. The product is distributed publicly, so it updates in-app from signed GitHub Releases (amendment 3.0.0, 2026-10-18). Network code is limited to the update check so the rest of the app keeps working offline and the dependency surface stays small.
 
 ---
 

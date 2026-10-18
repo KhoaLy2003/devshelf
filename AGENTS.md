@@ -2,7 +2,7 @@
 
 ## Purpose
 
-DevShelf is a single-user, offline, Windows 10/11 desktop app for organizing projects, editors, workspaces, config, notes, and an encrypted secrets vault. No cloud, sync, telemetry, or network calls.
+DevShelf is a single-user, local-first, Windows 10/11 desktop app for organizing projects, editors, workspaces, config, notes, and an encrypted secrets vault. No cloud, sync, or telemetry. The only network access is the signed update check.
 
 ## Stack
 
@@ -28,7 +28,7 @@ Tauri 2 (WebView2) shell; React + TypeScript + Vite UI; Rust core; SQLite via `r
 - TS files kebab-case; Rust files snake_case; one folder per Rust module.
 - Every Tauri command has one serde argument struct and one serde return type, returns a user-facing error code (never raw error strings), and its TS types live in `src/types/commands.ts` only.
 - Only Rust touches the DB, filesystem, processes, and secrets. SQL uses bound parameters; schema changes only via numbered `rusqlite_migration` migrations.
-- Never write files into user repos; tests use temp dirs; no network calls.
+- Never write files into user repos; tests use temp dirs; no network calls except the update check; tests never hit the network.
 - Commits: Conventional Commits (see README).
 
 Rules in full: [docs/constitution.md](docs/constitution.md).

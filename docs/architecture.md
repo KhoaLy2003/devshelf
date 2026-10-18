@@ -12,7 +12,7 @@
 
 ## 1. Context
 
-- Single user, Windows 10/11 desktop only, offline, local data only. No cloud, sync, team, or multi-user features (idea brief no-go list).
+- Single user, Windows 10/11 desktop only, local-first, local data only. The only network access is the signed update check against GitHub Releases. No cloud, sync, team, or multi-user features (idea brief no-go list).
 - Roadmap scope: 10 Must features (nine M, one S), 2 Should, 3 Could. Phase 2 runs as `feature` (one feature per cycle), because two domains exist (workspace/config/notes and secrets/encryption) and the dependency structure forms parallel streams after F01 to F03.
 - The product stores real credentials (vault) and project file references. Security and data safety outweigh feature breadth.
 - The stack is a hard constraint chosen by the user. The web-oriented catalog entries (Next.js, Supabase, Vercel, NextAuth, hosted services) do not apply and are not used.
@@ -31,7 +31,7 @@
 - Client-side routing and data fetching: React Router (seven sidebar areas) and TanStack Query (cached calls to Rust commands)
 - Command palette: `cmdk` (F11)
 
-**High-level architecture**: a single desktop application with a modular core. The webview renders screens and calls typed Tauri commands. All file, database, crypto, and process logic lives in the Rust core, organised by feature module (projects, editors, workspaces, config, notes, vault). No network layer.
+**High-level architecture**: a single desktop application with a modular core. The webview renders screens and calls typed Tauri commands. All file, database, crypto, process, and network logic lives in the Rust core, organised by feature module (projects, editors, workspaces, config, notes, vault, updates). The only network layer is the update check and download (`updates` module).
 
 ---
 
@@ -81,7 +81,7 @@
 - SQLCipher or whole-database encryption.
 - `tauri-plugin-stronghold`.
 - Redux or another global state store; ORMs; GraphQL.
-- Web services, authentication, sync, telemetry, and an auto-updater (single user, offline).
+- Web services, authentication, sync, and telemetry (single user, local-first).
 - A full-text search engine (SQLite `LIKE` or FTS5 is enough for F11).
 - A code-editor component (Markdown editing is a plain textarea).
 - Live file watching (`notify`).
@@ -123,7 +123,7 @@
 ## 6. Data & Integration
 
 - **Primary datastore**: a single SQLite file in the user's application data folder, accessed only from Rust. Secret values and note bodies are stored as encrypted fields; other metadata is plaintext.
-- **External integrations/APIs**: none. Editors are external executables the user configures. No network calls.
+- **External integrations/APIs**: GitHub Releases only, for the signed update check and download. Editors are external executables the user configures.
 - **Auth approach**: local master password for the vault (Argon2id). No accounts, no sessions, no tokens. Auto-lock after inactivity is enforced in the UI and the Rust layer, which zeroizes the unlocked key on lock.
 
 ---

@@ -1,6 +1,6 @@
 # DevShelf
 
-DevShelf is a single-user, offline Windows desktop app that organizes your projects, editor profiles, workspaces, config references, private notes, and an encrypted secrets vault. No cloud, sync, telemetry, or network calls.
+DevShelf is a single-user, local-first Windows desktop app that organizes your projects, editor profiles, workspaces, config references, private notes, and an encrypted secrets vault. No cloud, sync, or telemetry. The only network use is the update check.
 
 ![Home](docs/screenshots/home.png)
 
@@ -25,7 +25,15 @@ DevShelf is a single-user, offline Windows desktop app that organizes your proje
 
 ## Install
 
-### Option A: build the installer
+### Option A: download the installer
+
+Download `DevShelf_<version>_x64-setup.exe` from the [latest GitHub Release](https://github.com/KhoaLy2003/devshelf/releases/latest) and run it.
+
+The installer is not code-signed, so SmartScreen may warn on first run. Choose **More info**, then **Run anyway**.
+
+DevShelf checks GitHub Releases for updates when it starts (turn this off in **Settings > Updates**), and when you click **Check for updates**. It installs an update only after you click **Install and restart**. Your data in `%APPDATA%\app.devshelf.desktop` survives updates and uninstalling, unless you tick **Delete the application data** when uninstalling.
+
+### Option B: build the installer from source
 
 ```powershell
 git clone https://github.com/KhoaLy2003/devshelf.git
@@ -34,11 +42,13 @@ npm install
 npm run tauri build
 ```
 
-Then run `src-tauri\target\release\bundle\nsis\DevShelf_0.1.0_x64-setup.exe`, or the `.msi` in `src-tauri\target\release\bundle\msi\`. You can also run `src-tauri\target\release\devshelf.exe` directly.
+Then run `src-tauri\target\release\bundle\nsis\DevShelf_<version>_x64-setup.exe`. Building the installer needs the updater signing key (see Releasing). To build without it, skip the update artifacts:
 
-The installer is not code-signed, so SmartScreen may warn on first run. Choose **More info**, then **Run anyway**. No prebuilt release is published for this repository.
+```powershell
+npm run tauri build -- --config "{\"bundle\":{\"createUpdaterArtifacts\":false}}"
+```
 
-### Option B: run in development mode
+### Option C: run in development mode
 
 ```powershell
 git clone https://github.com/KhoaLy2003/devshelf.git
@@ -100,7 +110,7 @@ Repository layout:
 - `src-tauri/src/`: Rust core. `commands/` holds the Tauri commands. Domain modules are `projects`, `editors`, `workspaces`, `config`, `notes`, `vault`, and `secrets`. `db/` handles SQLite persistence.
 - `tests/`: Vitest tests.
 - `docs/`: architecture, constitution, design, roadmap, and models.
-- `.github/workflows/`: CI (lint, build, Vitest, cargo test).
+- `.github/workflows/`: CI (lint, build, Vitest, cargo test) on pushes and pull requests; release (verify, build a signed installer and `latest.json`, create a draft GitHub Release) on `v*` tags.
 
 Tech stack: Tauri 2 (WebView2), React, TypeScript, Vite, Rust, and SQLite (`rusqlite` with bundled SQLite and `rusqlite_migration`). Details are in [docs/architecture.md](docs/architecture.md).
 
@@ -111,7 +121,7 @@ Coding standards: [docs/constitution.md](docs/constitution.md).
 - **File naming**: kebab-case for TypeScript/TSX files and folders (`app.tsx`, `quick-open.ts`); snake_case for Rust files and modules (`project_registry.rs`). One folder per Rust domain module.
 - **Tests**: TypeScript tests live in `tests/` and are named `*.test.ts` or `*.test.tsx`. Rust tests live in `#[cfg(test)]` modules beside the code, or in `src-tauri/tests/` for integration tests. Tests use temporary directories, never the real user data folder.
 - **Commit messages**: Conventional Commits, `type(scope): summary` in the imperative mood, with types `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci` (for example `feat(projects): add project registry`).
-- **Releasing**: `feat`, `fix`, `perf`, `refactor`, and breaking commits (`!` after the type, or a `BREAKING CHANGE:` footer) appear in `CHANGELOG.md`. Preview with `npm run release -- <patch|minor|major|X.Y.Z> --dry-run`, then run it without `--dry-run` on a clean tree, then `git push origin HEAD --follow-tags`. Pushing the `v*` tag runs `.github/workflows/release.yml`, which fails if the tag does not match the version files and the top `CHANGELOG.md` heading, then runs lint, build, and test. While the version is below 1.0, a breaking change or feature is a `minor` bump and a fix is a `patch`; use `major` only from 1.0.0 onward. Edit the in-app Help changelog (`src/lib/help-content.ts`) by hand before releasing.
+- **Releasing**: `feat`, `fix`, `perf`, `refactor`, and breaking commits (`!` after the type, or a `BREAKING CHANGE:` footer) appear in `CHANGELOG.md`. Preview with `npm run release -- <patch|minor|major|X.Y.Z> --dry-run`, then run it without `--dry-run` on a clean tree, then `git push origin HEAD --follow-tags`. Pushing the `v*` tag runs `.github/workflows/release.yml`: it fails if the tag does not match the version files and the top `CHANGELOG.md` heading, runs lint, build, and test, then builds the signed installer and `latest.json` and creates a **draft** GitHub Release with the CHANGELOG notes. The build needs the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Install the draft's `.exe` to smoke test it, then publish the release; installed apps only see published releases. Never move or reuse a published tag. While the version is below 1.0, a breaking change or feature is a `minor` bump and a fix is a `patch`; use `major` only from 1.0.0 onward. Edit the in-app Help changelog (`src/lib/help-content.ts`) by hand before releasing.
 
 ## License
 
