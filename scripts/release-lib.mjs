@@ -15,28 +15,23 @@ export const VERSION_FILES = [
   "src/lib/help-content.ts",
 ];
 
-const COMMIT_RE = /^(\w+)(?:\(([^)]+)\))?(!)?: (.+)$/;
-const BREAKING_FOOTER_RE = /^BREAKING[ -]CHANGE:/m;
+// Curated, user-facing notes. Feature PRs add bullets to unreleased.md; the release moves them
+// into vX.Y.Z.md, which is the source for the CHANGELOG section, the GitHub release body and
+// the in-app changelog.
+export const NOTES_DIR = "release-notes";
+export const UNRELEASED_NOTES = `${NOTES_DIR}/unreleased.md`;
+
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 
-export function parseCommit({ hash, subject, body = "" }) {
-  const match = COMMIT_RE.exec(subject.trim());
-  if (!match) return null;
-  const [, type, scope = null, bang, summary] = match;
-  return {
-    type,
-    scope,
-    summary,
-    breaking: bang === "!" || BREAKING_FOOTER_RE.test(body),
-    short: hash.slice(0, 7),
-  };
+export function notesFileFor(version) {
+  return `${NOTES_DIR}/v${version}.md`;
 }
 
 function parts(version) {
   return version.split(".").map(Number);
 }
 
-function compareVersions(a, b) {
+export function compareVersions(a, b) {
   const pa = parts(a);
   const pb = parts(b);
   for (let i = 0; i < 3; i++) {
@@ -59,34 +54,33 @@ export function nextVersion(current, bump) {
   return bump;
 }
 
-const SUBSECTIONS = [
-  { heading: "Breaking changes", pick: (c) => c.breaking },
-  { heading: "Added", pick: (c) => !c.breaking && c.type === "feat" },
-  { heading: "Fixed", pick: (c) => !c.breaking && c.type === "fix" },
-  {
-    heading: "Changed",
-    pick: (c) => !c.breaking && (c.type === "perf" || c.type === "refactor"),
-  },
-];
-
-function formatEntry(commit) {
-  const prefix = commit.scope ? `**${commit.scope}:** ` : "";
-  return `- ${prefix}${commit.summary} (${commit.short})`;
+// Trims the notes and rejects anything that would break the CHANGELOG layout or the generated
+// in-app file: empty notes, "## " headings (the CHANGELOG uses them for versions), and quote or
+// backslash characters (the generated TypeScript keeps strings verbatim).
+export function normalizeNotes(text) {
+  const trimmed = text.trim();
+  if (trimmed === "") {
+    throw new Error("Release notes are empty: add bullets to release-notes/unreleased.md");
+  }
+  if (/^## /m.test(trimmed)) {
+    throw new Error("Release notes must not use ## headings; use ### for subsections");
+  }
+  if (/["\\]/.test(trimmed)) {
+    throw new Error("Release notes must not contain double quotes or backslashes");
+  }
+  return trimmed;
 }
 
-export function renderSection(version, date, commits) {
-  const blocks = SUBSECTIONS.map(({ heading, pick }) => {
-    const entries = commits.filter(pick).map(formatEntry);
-    return entries.length === 0 ? null : { heading, entries };
-  }).filter(Boolean);
+export function renderSection(version, date, notes) {
+  return `## [${version}] - ${date}\n\n${normalizeNotes(notes)}\n`;
+}
 
-  if (blocks.length === 0) return "";
-
-  const lines = [`## [${version}] - ${date}`, ""];
-  for (const { heading, entries } of blocks) {
-    lines.push(`### ${heading}`, "", ...entries, "");
-  }
-  return lines.join("\n") + "\n";
+// Bullet text of one release's notes, for the in-app changelog.
+export function noteItems(notes) {
+  return notes
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("- "))
+    .map((line) => line.slice(2).trim());
 }
 
 export function insertSection(changelog, section) {
