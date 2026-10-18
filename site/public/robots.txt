@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://khoaly2003.github.io/devshelf/sitemap.xml
