@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { insertSection, nextVersion, parseCommit, renderSection } from "../scripts/release-lib.mjs";
+import {
+  extractChangelogSection,
+  insertSection,
+  nextVersion,
+  parseCommit,
+  renderSection,
+} from "../scripts/release-lib.mjs";
 
 const hash = "0123456789abcdef0123456789abcdef01234567";
 
@@ -118,5 +124,36 @@ describe("insertSection", () => {
     const result = insertSection(existing, section);
     expect(result.startsWith("# Changelog\n\nIntro line.\n\n## [0.2.0]")).toBe(true);
     expect(result.indexOf("## [0.2.0]")).toBeLessThan(result.indexOf("## [0.1.0]"));
+  });
+});
+
+describe("extractChangelogSection", () => {
+  const changelog = [
+    "# Changelog",
+    "",
+    "## [0.2.0] - 2026-10-18",
+    "",
+    "### Added",
+    "- New thing",
+    "",
+    "## [0.1.0] - 2026-10-01",
+    "",
+    "### Fixed",
+    "- Old fix",
+    "",
+  ].join("\n");
+
+  it("returns the body of a non-last section without its heading", () => {
+    expect(extractChangelogSection(changelog, "0.2.0")).toBe("### Added\n- New thing");
+  });
+
+  it("returns the last section through end of file", () => {
+    expect(extractChangelogSection(changelog, "0.1.0")).toBe("### Fixed\n- Old fix");
+  });
+
+  it("throws when the version has no section", () => {
+    expect(() => extractChangelogSection(changelog, "9.9.9")).toThrow(
+      "No CHANGELOG section for 9.9.9",
+    );
   });
 });

@@ -143,6 +143,27 @@ export function readChangelogTopVersion(root = repoRoot) {
   return readOrThrow(/^## \[(\d+\.\d+\.\d+)\]/m, readText(root, "CHANGELOG.md"), "CHANGELOG.md");
 }
 
+// Body text of one CHANGELOG version section, without its heading. Used as the GitHub Release notes.
+export function extractChangelogSection(changelog, version) {
+  const lines = changelog.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.startsWith(`## [${version}]`));
+  if (start === -1) {
+    throw new Error(`No CHANGELOG section for ${version}`);
+  }
+  let end = lines.findIndex((line, index) => index > start && line.startsWith("## ["));
+  if (end === -1) {
+    end = lines.length;
+  }
+  return lines
+    .slice(start + 1, end)
+    .join("\n")
+    .trim();
+}
+
+export function readChangelogSection(version, root = repoRoot) {
+  return extractChangelogSection(readText(root, "CHANGELOG.md"), version);
+}
+
 // Replaces the first match of `pattern`; throws if nothing matched so a
 // layout change can never silently leave a stale version behind.
 function replaceFirst(root, relativePath, pattern, replacement) {
