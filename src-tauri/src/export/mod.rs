@@ -1,7 +1,8 @@
 //! Plaintext export: every table as CSV, written into a new folder the user picked. The files hold
-//! decrypted note bodies and secret values, so callers gate this behind the master password and an
-//! acknowledgement. `collect` reads everything before anything is written, so a failure leaves no
-//! partial backup on disk.
+//! decrypted secret values and note bodies, so callers gate this behind the master password and an
+//! acknowledgement. Each note is written as its own Markdown file under `notes/`; `notes.csv` indexes
+//! them without bodies. `collect` reads everything before anything is written, so a failure leaves
+//! no partial backup on disk.
 
 mod csv;
 
@@ -76,6 +77,7 @@ pub struct ExportFile {
 /// Every file's bytes, held in memory until `write` succeeds or the value is dropped.
 pub struct Dataset {
     files: Vec<(ExportFile, Zeroizing<Vec<u8>>)>,
+    note_files: Vec<(String, Zeroizing<Vec<u8>>)>,
     stamp: String,
 }
 
@@ -126,6 +128,64 @@ fn project_name(names: &HashMap<i64, String>, id: Option<i64>) -> String {
     id.and_then(|id| names.get(&id).cloned()).unwrap_or_default()
 }
 
+/// `<id zero-padded to 6>-<slug>.md`. The numeric prefix keeps names unique and keeps Windows
+/// reserved names (CON, NUL, ...) and trailing dots or spaces out of the result.
+fn note_file_name(id: i64, title: &str) -> String {
+    let mut slug = String::new();
+    for c in title.chars() {
+        if c.is_alphanumeric() {
+            slug.push(c);
+        } else if !slug.ends_with('-') {
+            slug.push('-');
+        }
+    }
+    let cut: String = slug.trim_matches('-').chars().take(50).collect();
+    let cut = cut.trim_end_matches('-');
+    let slug = if cut.is_empty() { "untitled" } else { cut };
+    format!("{id:06}-{slug}.md")
+}
+
+/// Double-quoted YAML scalar with backslash, quote and control characters escaped.
+fn yaml_quote(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() + 2);
+    out.push('"');
+    for c in value.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c.is_control() => out.push_str(&format!("\\u{:04X}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// The note as a Markdown file: YAML front matter, a blank line, then the body exactly as stored.
+/// The body is copied straight into the output buffer, never into an intermediate string.
+fn note_markdown(note: &notes::ExportedNote, project: &str) -> Zeroizing<Vec<u8>> {
+    let mut head = Zeroizing::new(String::new());
+    head.push_str("---\n");
+    head.push_str(&format!("id: {}\n", note.id));
+    head.push_str(&format!("title: {}\n", yaml_quote(&note.title)));
+    if let Some(project_id) = note.project_id {
+        head.push_str(&format!("project_id: {project_id}\n"));
+    }
+    if !project.is_empty() {
+        head.push_str(&format!("project: {}\n", yaml_quote(project)));
+    }
+    head.push_str(&format!("created_at: {}\n", yaml_quote(&note.created_at)));
+    head.push_str(&format!("updated_at: {}\n", yaml_quote(&note.updated_at)));
+    head.push_str("---\n\n");
+    let mut bytes = Zeroizing::new(Vec::with_capacity(head.len() + note.body.len()));
+    bytes.extend_from_slice(head.as_bytes());
+    bytes.extend_from_slice(note.body.as_bytes());
+    bytes
+}
+
 fn stamp(storage: &Storage) -> Result<String, ExportError> {
     storage
         .connection()
@@ -133,9 +193,10 @@ fn stamp(storage: &Storage) -> Result<String, ExportError> {
         .map_err(|_| unavailable())
 }
 
-/// Reads every table. Nothing is written to disk here; any failure aborts the whole export.
-/// `note_key` is `notes::load_key` taken before the lock; `vault_key` is `None` when the vault was
-/// never set up, which leaves `secrets.csv` with its header only.
+/// Reads every table and renders each note to Markdown. Nothing is written to disk here; any
+/// failure aborts the whole export. `note_key` is `notes::load_key` taken before the lock;
+/// `vault_key` is `None` when the vault was never set up, which leaves `secrets.csv` with its
+/// header only.
 pub fn collect(
     storage: &Storage,
     keys: &dyn KeyStore,
@@ -263,24 +324,28 @@ pub fn collect(
             "project_id",
             "project_name",
             "title",
-            "body",
+            "file",
             "created_at",
             "updated_at",
         ],
     );
+    let mut note_files = Vec::with_capacity(exported_notes.len());
     for note in &exported_notes {
         let id = note.id.to_string();
         let note_project = opt_id(note.project_id);
         let note_project_name = project_name(&names, note.project_id);
+        let file_name = note_file_name(note.id, &note.title);
+        let file_path = format!("notes/{file_name}");
         notes_table.row(&[
             id.as_str(),
             note_project.as_str(),
             note_project_name.as_str(),
             note.title.as_str(),
-            note.body.as_str(),
+            file_path.as_str(),
             note.created_at.as_str(),
             note.updated_at.as_str(),
         ]);
+        note_files.push((file_name, note_markdown(note, &note_project_name)));
     }
 
     let exported_secrets = match vault_key {
@@ -330,12 +395,13 @@ pub fn collect(
     .into_iter()
     .map(Table::finish)
     .collect();
-    Ok(Dataset { files, stamp })
+    Ok(Dataset { files, note_files, stamp })
 }
 
 /// Creates `devshelf-export-<stamp>` inside `parent` and writes each file. `create_dir` refuses an
-/// existing folder, so an earlier export is never overwritten or removed. If a file write fails,
-/// only the folder created here is removed.
+/// existing folder, so an earlier export is never overwritten or removed. Notes go into a `notes/`
+/// subfolder, created only when there are notes. If any write fails, only the folder created here
+/// is removed.
 pub fn write(dataset: &Dataset, parent: &Path) -> Result<(PathBuf, Vec<ExportFile>), ExportError> {
     let dir = parent.join(format!("devshelf-export-{}", dataset.stamp));
     std::fs::create_dir(&dir).map_err(|_| write_failed())?;
@@ -346,6 +412,19 @@ pub fn write(dataset: &Dataset, parent: &Path) -> Result<(PathBuf, Vec<ExportFil
             return Err(write_failed());
         }
         written.push(file.clone());
+    }
+    if !dataset.note_files.is_empty() {
+        let notes_dir = dir.join("notes");
+        let result = std::fs::create_dir(&notes_dir).and_then(|()| {
+            dataset
+                .note_files
+                .iter()
+                .try_for_each(|(name, bytes)| std::fs::write(notes_dir.join(name), bytes.as_slice()))
+        });
+        if result.is_err() {
+            let _ = std::fs::remove_dir_all(&dir);
+            return Err(write_failed());
+        }
     }
     Ok((dir, written))
 }
@@ -481,7 +560,16 @@ mod tests {
         assert_eq!(rows, [1, 1, 1, 1, 4, 1, 1]);
         let notes_bytes = std::fs::read(dir.join("notes.csv")).unwrap();
         assert!(notes_bytes.starts_with(&[0xEF, 0xBB, 0xBF]));
-        assert!(read(&dir, "notes.csv").contains(NOTE_BODY));
+        let csv = read(&dir, "notes.csv");
+        assert!(!csv.contains(NOTE_BODY));
+        let row: Vec<&str> = csv.lines().nth(1).unwrap().split(',').collect();
+        assert_eq!(row[4], "notes/000001-Ops.md");
+        let (created, updated) = (row[5], row[6]);
+        let expected = format!(
+            "---\nid: {}\ntitle: \"Ops\"\nproject_id: {}\nproject: \"alpha\"\ncreated_at: \"{created}\"\nupdated_at: \"{updated}\"\n---\n\n{NOTE_BODY}",
+            row[0], row[1]
+        );
+        assert_eq!(read(&dir, "notes/000001-Ops.md"), expected);
         assert!(read(&dir, "secrets.csv").contains(SECRET_VALUE));
         assert!(read(&dir, "projects.csv").contains("api;web"));
         assert!(read(&dir, "secrets.csv").contains(",alpha,"));
@@ -514,6 +602,7 @@ mod tests {
             "\u{feff}id,label,secret_type,project_id,project_name,environment,value,created_at,updated_at\r\n"
         ));
         assert_eq!(read(&dir, "notes.csv").lines().count(), 1);
+        assert!(!dir.join("notes").exists());
     }
 
     #[test]
@@ -558,5 +647,62 @@ mod tests {
 
         assert_eq!(err.code, ExportCode::WriteFailed);
         assert_eq!(std::fs::read(dir.join("notes.csv")).unwrap(), before);
+    }
+
+    /// Exports a vault with one project-less note saved under `title` and `body`.
+    fn export_one_note(title: &str, body: &str) -> (Fixture, PathBuf) {
+        let f = vault_only();
+        let storage = f.db.lock().unwrap();
+        let note = notes::create(&storage, &f.keys, None, None).unwrap();
+        notes::save(
+            &storage,
+            &f.keys,
+            notes::load_key(&f.keys).unwrap(),
+            note.summary.id,
+            title,
+            None,
+            body,
+        )
+        .unwrap();
+        drop(storage);
+        let vault_key = vault::verified_key(&f.db, PW).unwrap().unwrap();
+        let storage = f.db.lock().unwrap();
+        let dataset = collect(
+            &storage,
+            &f.keys,
+            notes::load_key(&f.keys).unwrap(),
+            Some(&vault_key),
+        )
+        .unwrap();
+        drop(storage);
+        let (dir, _) = write(&dataset, f.out.path()).unwrap();
+        (f, dir)
+    }
+
+    #[test]
+    fn note_file_name_is_safe_and_unique() {
+        assert_eq!(note_file_name(7, "../..\\CON:*?\"x\""), "000007-CON-x.md");
+        assert_eq!(note_file_name(3, "   "), "000003-untitled.md");
+        assert_eq!(note_file_name(1, "Café ünï"), "000001-Café-ünï.md");
+        let long = note_file_name(1, &"a".repeat(200));
+        let slug = long.trim_start_matches("000001-").trim_end_matches(".md");
+        assert_eq!(slug.chars().count(), 50);
+        assert_ne!(note_file_name(1, "same"), note_file_name(2, "same"));
+    }
+
+    #[test]
+    fn multiline_body_with_quotes_and_commas_is_written_verbatim() {
+        let body = "a, b\n\"quoted\"\r\nlast line\n";
+        let (_f, dir) = export_one_note("Ops", body);
+        let md = read(&dir, "notes/000001-Ops.md");
+        assert!(md.ends_with(&format!("---\n\n{body}")));
+        assert_eq!(read(&dir, "notes.csv").lines().count(), 2);
+    }
+
+    #[test]
+    fn a_title_with_quotes_and_backslashes_is_escaped_in_front_matter() {
+        let (_f, dir) = export_one_note(r#"He said "hi" C:\tmp"#, "body");
+        let md = read(&dir, "notes/000001-He-said-hi-C-tmp.md");
+        assert!(md.contains(r#"title: "He said \"hi\" C:\\tmp""#));
     }
 }
