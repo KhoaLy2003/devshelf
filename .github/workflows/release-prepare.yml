@@ -1,0 +1,77 @@
+name: Release prepare
+
+# Start a release from the Actions tab: Run workflow, choose the bump. The workflow edits the
+# version files and CHANGELOG, opens a release PR, and enables auto-merge. The PR merges once CI
+# passes; the Release workflow then tags the merged commit and builds the draft release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "patch, minor, major, or an explicit version such as 0.4.0"
+        required: true
+        default: patch
+        type: string
+      dry_run:
+        description: "Print the release section and file list; change nothing"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-prepare
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # RELEASE_TOKEN (not GITHUB_TOKEN) so the PR it opens triggers CI.
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Preview release (dry run)
+        if: ${{ inputs.dry_run }}
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: node scripts/release.mjs "$BUMP" --dry-run
+
+      - name: Bump versions and write release notes
+        if: ${{ !inputs.dry_run }}
+        id: bump
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+          node scripts/release.mjs "$BUMP"
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Open release PR and enable auto-merge
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          set -euo pipefail
+          BRANCH="release/v$VERSION"
+          git config user.name "release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock \
+            src-tauri/tauri.conf.json src/lib/help-content.ts src/lib/changelog-data.ts \
+            CHANGELOG.md release-notes
+          git commit -m "chore(release): v$VERSION"
+          git push -u origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" --title "chore(release): v$VERSION" \
+            --body "Automated release PR for v$VERSION. Check the CHANGELOG section and release-notes/v$VERSION.md. Auto-merge is enabled and merges once CI passes."
+          gh pr merge "$BRANCH" --auto --squash --delete-branch
