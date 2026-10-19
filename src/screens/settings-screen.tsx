@@ -49,7 +49,7 @@ function ExportSection() {
   return (
     <section className="mb-6 rounded-2xl border border-hairline bg-surface p-5">
       <h2 className="m-0 mb-3 text-xl font-semibold">Export data</h2>
-      <p className="m-0 mb-3 text-ink-muted">Save all your data as CSV files.</p>
+      <p className="m-0 mb-3 text-ink-muted">Save all your data as CSV and Markdown files.</p>
       <button
         type="button"
         onClick={() => setOpen(true)}

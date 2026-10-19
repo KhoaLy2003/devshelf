@@ -97,12 +97,13 @@ export function ExportDataDialog({ onClose }: ExportDataDialogProps) {
           </h2>
           <p className="m-0 mb-4 text-warning">
             This export is not encrypted. Your notes and secret values are written as plain text to
-            CSV files that anyone who can open the folder can read, including backup and cloud-sync
-            tools. Save them somewhere private, never inside a project repository, and delete them
-            when you no longer need them.
+            CSV files and Markdown note files that anyone who can open the folder can read,
+            including backup and cloud-sync tools. Save them somewhere private, never inside a
+            project repository, and delete them when you no longer need them.
           </p>
           <p className="m-0 mb-4 text-ink-muted">
-            Includes projects, workspaces, config files, editor profiles, notes and secrets.
+            Includes projects, workspaces, config files, editor profiles and secrets as CSV, and
+            each note as its own Markdown file in a notes folder.
           </p>
           {vaultSetUp ? (
             <div className="mb-4">
