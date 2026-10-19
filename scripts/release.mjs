@@ -1,40 +1,29 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { CHANGELOG_DATA_PATH, writeChangelogData } from "./gen-changelog.mjs";
 import {
+  UNRELEASED_NOTES,
   VERSION_FILES,
   applyVersion,
   insertSection,
   nextVersion,
-  parseCommit,
+  notesFileFor,
+  normalizeNotes,
   readVersions,
   renderSection,
   repoRoot,
 } from "./release-lib.mjs";
 
-const USAGE = "Usage: npm run release -- <patch|minor|major|X.Y.Z> [--dry-run] [--since <ref>]";
+const USAGE = "Usage: npm run release -- <patch|minor|major|X.Y.Z> [--dry-run]";
 const KEYWORD_BUMPS = ["patch", "minor", "major"];
 const EXPLICIT_RE = /^\d+\.\d+\.\d+$/;
-
-function git(args) {
-  return execFileSync("git", args, {
-    cwd: repoRoot,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-}
 
 function parseArgs(argv) {
   let bump;
   let dryRun = false;
-  let since = null;
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
+  for (const arg of argv) {
     if (arg === "--dry-run") {
       dryRun = true;
-    } else if (arg === "--since") {
-      since = argv[++i];
-      if (!since) throw new Error(USAGE);
     } else if (arg.startsWith("--")) {
       throw new Error(`Unknown option: ${arg}\n${USAGE}`);
     } else if (bump === undefined) {
@@ -47,63 +36,37 @@ function parseArgs(argv) {
   if (!KEYWORD_BUMPS.includes(bump) && !EXPLICIT_RE.test(bump)) {
     throw new Error(`Unknown bump: ${bump}\n${USAGE}`);
   }
-  return { bump, dryRun, since };
+  return { bump, dryRun };
 }
 
-function resolveBase(since) {
-  if (since) return since;
-  try {
-    return git(["describe", "--tags", "--abbrev=0", "--match", "v*"]).trim();
-  } catch {
-    throw new Error("No v* tag found; pass --since <ref>");
-  }
-}
-
-function readCommits(base) {
-  const raw = git(["log", `${base}..HEAD`, "--no-merges", "--format=%H%x1f%s%x1f%b%x1e"]);
-  return raw
-    .split("\x1e")
-    .map((record) => record.trim())
-    .filter((record) => record !== "")
-    .map((record) => {
-      const [hash, subject, body = ""] = record.split("\x1f");
-      return parseCommit({ hash, subject, body });
-    })
-    .filter((commit) => commit !== null);
-}
-
+// Edits files only. Committing, branching and tagging happen in the release workflow, so the
+// release commit is always the one the reviewed PR merged.
 function main() {
-  const { bump, dryRun, since } = parseArgs(process.argv.slice(2));
+  const { bump, dryRun } = parseArgs(process.argv.slice(2));
 
   const versions = readVersions();
   const [, current] = Object.entries(versions)[0];
-  const disagree = Object.values(versions).some((value) => value !== current);
-  if (disagree) {
+  if (Object.values(versions).some((value) => value !== current)) {
     for (const [file, value] of Object.entries(versions)) {
       console.error(`  ${file}: ${value}`);
     }
     throw new Error("Version files disagree");
   }
 
-  if (!dryRun && git(["status", "--porcelain"]).trim() !== "") {
-    throw new Error("Working tree is not clean");
-  }
-
-  const base = resolveBase(since);
-  const commits = readCommits(base);
-
   const version = nextVersion(current, bump);
-  if (git(["tag", "--list", `v${version}`]).trim() !== "") {
-    throw new Error(`Tag v${version} already exists`);
-  }
+  const unreleasedPath = join(repoRoot, UNRELEASED_NOTES);
+  const notes = normalizeNotes(
+    existsSync(unreleasedPath) ? readFileSync(unreleasedPath, "utf8") : "",
+  );
+  const section = renderSection(version, new Date().toLocaleDateString("en-CA"), notes);
 
-  const date = new Date().toLocaleDateString("en-CA");
-  const section = renderSection(version, date, commits);
-  if (section === "") {
-    throw new Error(`No releasable commits since ${base}`);
-  }
-
-  const files = [...VERSION_FILES, "CHANGELOG.md"];
+  const files = [
+    ...VERSION_FILES,
+    "CHANGELOG.md",
+    UNRELEASED_NOTES,
+    notesFileFor(version),
+    CHANGELOG_DATA_PATH,
+  ];
 
   if (dryRun) {
     console.log(`${current} -> ${version}\n`);
@@ -118,13 +81,12 @@ function main() {
   const changelogPath = join(repoRoot, "CHANGELOG.md");
   const existing = existsSync(changelogPath) ? readFileSync(changelogPath, "utf8") : "";
   writeFileSync(changelogPath, insertSection(existing, section), "utf8");
+  writeFileSync(join(repoRoot, notesFileFor(version)), notes + "\n", "utf8");
+  writeFileSync(unreleasedPath, "", "utf8");
+  writeChangelogData();
 
-  git(["add", ...files]);
-  git(["commit", "-m", `chore(release): v${version}`]);
-  git(["tag", "-a", `v${version}`, "-m", `DevShelf ${version}`]);
-
-  console.log(`Released v${version}.`);
-  console.log("Push with: git push origin HEAD --follow-tags");
+  console.log(`Prepared v${version}. Changed files:`);
+  for (const file of files) console.log(`  ${file}`);
 }
 
 try {

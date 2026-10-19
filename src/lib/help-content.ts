@@ -1,3 +1,5 @@
+import { CHANGELOG_RELEASES } from "./changelog-data";
+
 export const APP_VERSION = "0.3.0";
 
 export interface HelpGroup {
@@ -122,27 +124,12 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
   {
     id: "changelog",
     title: "Changelog",
-    body: [`Version ${APP_VERSION}. Features shipped in this build:`],
+    body: ["Release notes for each version, newest first."],
     groups: [
-      {
-        heading: `Version ${APP_VERSION}`,
-        items: [
-          "F01 Foundation and navigation",
-          "F02 Project registry",
-          "F03 Editor profiles",
-          "F04 Workspace builder",
-          "F05 Workspace restore with missing-path report",
-          "F06 Config catalog",
-          "F07 Private project notes",
-          "F08 Vault access control",
-          "F09 Secret entries",
-          "F10 Home overview",
-          "F15 Project unregister (removes registration only; files are not touched)",
-          "F16 Help",
-          "Vault delete (requires the master password; removes all secrets)",
-          "Updates: DevShelf checks GitHub Releases at startup (turn this off in Settings) or on demand, and installs only after you confirm",
-        ],
-      },
+      ...CHANGELOG_RELEASES.map((release) => ({
+        heading: `Version ${release.version}`,
+        items: release.items,
+      })),
       {
         heading: "Not in this version",
         items: [

@@ -1,19 +1,60 @@
 name: Release
+
+# Runs on every push to main. Does nothing unless the version in package.json changed and the
+# matching tag does not exist yet, so ordinary commits do not release.
+
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
-  verify-tag:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tag the commit when the version changed
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          NEW=$(node -p "require('./package.json').version")
+          OLD=$(git show HEAD~1:package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+          if [ "$NEW" = "$OLD" ]; then
+            echo "Version unchanged ($NEW); no release."
+            exit 0
+          fi
+          if git rev-parse -q --verify "refs/tags/v$NEW" >/dev/null; then
+            echo "Tag v$NEW already exists; no release."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$NEW" -m "DevShelf $NEW"
+          git push origin "v$NEW"
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+
+  verify:
+    needs: tag
+    if: ${{ needs.tag.outputs.version != '' }}
     runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.tag.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,29 +62,37 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Check tag matches version files and CHANGELOG
+      - name: Check version files, CHANGELOG and release notes match the tag
         shell: bash
         run: |
           node --input-type=module -e "
-          import { readVersions, readChangelogTopVersion } from './scripts/release-lib.mjs';
-          const tag = process.env.GITHUB_REF_NAME.replace(/^v/, '');
+          import { existsSync } from 'node:fs';
+          import { readVersions, readChangelogTopVersion, notesFileFor } from './scripts/release-lib.mjs';
+          const tag = process.env.VERSION;
           const found = new Set([...Object.values(readVersions()), readChangelogTopVersion()]);
           if (found.size !== 1 || !found.has(tag)) {
-            console.error('Tag ' + tag + ' does not match: ' + [...found].join(', '));
+            console.error('Version ' + tag + ' does not match: ' + [...found].join(', '));
             process.exit(1);
           }
-          console.log('Tag ' + tag + ' matches all version locations and CHANGELOG');
+          if (!existsSync(notesFileFor(tag))) {
+            console.error('Missing ' + notesFileFor(tag));
+            process.exit(1);
+          }
+          console.log('Version ' + tag + ' matches all version locations, CHANGELOG and release notes');
           "
       - run: npm run lint
       - run: npm run build
       - run: npm run test
 
   build:
-    needs: verify-tag
+    needs: [tag, verify]
+    if: ${{ needs.tag.outputs.version != '' }}
     runs-on: windows-latest
     timeout-minutes: 45
     permissions:
       contents: write
+    env:
+      VERSION: ${{ needs.tag.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -58,13 +107,13 @@ jobs:
       - name: Rust tests
         working-directory: src-tauri
         run: cargo test
-      - name: Read CHANGELOG notes for this tag
+      - name: Read CHANGELOG notes for this version
         id: notes
         shell: bash
         run: |
           {
             echo "body<<NOTES_EOF"
-            node --input-type=module -e "import { readChangelogSection } from './scripts/release-lib.mjs'; console.log(readChangelogSection(process.env.GITHUB_REF_NAME.replace(/^v/, '')));"
+            node --input-type=module -e "import { readChangelogSection } from './scripts/release-lib.mjs'; console.log(readChangelogSection(process.env.VERSION));"
             echo "NOTES_EOF"
           } >> "$GITHUB_OUTPUT"
       - name: Build signed installer and updater metadata
@@ -74,8 +123,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: DevShelf ${{ github.ref_name }}
+          tagName: v${{ needs.tag.outputs.version }}
+          releaseName: DevShelf v${{ needs.tag.outputs.version }}
           releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           prerelease: false
